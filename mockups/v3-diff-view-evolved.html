@@ -130,20 +130,13 @@ a:hover { text-decoration: underline; }
 #splash-enter {
   position: absolute; bottom: 45px; left: 65px; z-index: 2;
   font-family: 'Courier New', monospace; font-size: 14px;
-  color: #e6edf3; background: rgba(17,17,17,0.7); border: 1px solid #444;
+  color: #e6edf3; background: none; border: none;
   padding: 12px 24px; cursor: pointer; letter-spacing: 1px;
-  transition: border-color 0.3s, color 0.3s, opacity 1s ease;
+  transition: color 0.3s, opacity 1s ease;
   opacity: 0; pointer-events: none;
 }
 #splash-enter.visible { opacity: 1; pointer-events: auto; }
-#splash-enter:hover { border-color: #58a6ff; color: #58a6ff; }
-#splash-enter.pulse {
-  animation: splash-pulse 2s ease-in-out infinite;
-}
-@keyframes splash-pulse {
-  0%, 100% { border-color: #444; }
-  50% { border-color: #58a6ff; }
-}
+#splash-enter:hover { color: #58a6ff; }
 #splash-copyright {
   position: absolute; bottom: 50px; right: 65px; z-index: 2;
   font-family: 'Courier New', monospace; font-size: 12px;
@@ -1773,7 +1766,6 @@ a:hover { text-decoration: underline; }
     document.getElementById('splash-enter').classList.add('visible');
     document.getElementById('splash-copyright').classList.add('visible');
     var enterBtn = document.getElementById('splash-enter');
-    enterBtn.classList.add('pulse');
 
     // Start repulsion
     var mouseX = -9999, mouseY = -9999;
