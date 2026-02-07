@@ -17,6 +17,18 @@
   container.style.width = gridW + 'px';
   container.style.height = gridH + 'px';
 
+  // Scale down to fit viewport on small screens
+  var PAD = 0.92;
+  var scale = 1;
+  function calcScale() {
+    var sx = (window.innerWidth * PAD) / gridW;
+    var sy = (window.innerHeight * PAD) / gridH;
+    scale = Math.min(sx, sy, 1);
+    container.style.transform = 'scale(' + scale + ')';
+  }
+  calcScale();
+  window.addEventListener('resize', calcScale);
+
   var vw = window.innerWidth;
   var vh = window.innerHeight;
   var centerRow = H / 2;
@@ -31,8 +43,8 @@
     var r = particles[i][3], g = particles[i][4], b = particles[i][5];
     var tx = col * CHAR_W;
     var ty = row * ROW_H;
-    var sx = (Math.random() - 0.5) * vw * 1.5 + gridW / 2;
-    var sy = (Math.random() - 0.5) * vh * 1.5 + gridH / 2;
+    var sx = (Math.random() - 0.5) * (vw / scale) * 1.5 + gridW / 2;
+    var sy = (Math.random() - 0.5) * (vh / scale) * 1.5 + gridH / 2;
     var dr = row - centerRow, dc = col - centerCol;
     var dist = Math.sqrt(dr * dr + dc * dc);
     var delay = (dist / maxDist) * 1800;
@@ -96,8 +108,8 @@
     var containerRect = container.getBoundingClientRect();
 
     document.addEventListener('mousemove', function(e) {
-      mouseX = e.clientX - containerRect.left;
-      mouseY = e.clientY - containerRect.top;
+      mouseX = (e.clientX - containerRect.left) / scale;
+      mouseY = (e.clientY - containerRect.top) / scale;
     });
     document.addEventListener('mouseleave', function() { mouseX = -9999; mouseY = -9999; });
     window.addEventListener('resize', function() { containerRect = container.getBoundingClientRect(); });
