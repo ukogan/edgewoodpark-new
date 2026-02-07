@@ -1,0 +1,1835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Uri Kogan - Builder PM | The Diff View v3</title>
+<style>
+/* ============================================================
+   CSS CUSTOM PROPERTIES
+   ============================================================ */
+:root {
+  /* Core palette - dark editor theme */
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #21262d;
+  --bg-hover: #30363d;
+  --border-primary: #30363d;
+  --border-secondary: #21262d;
+  --border-accent: #58a6ff;
+
+  /* Diff colors - FIXED for contrast (WCAG AA compliant)
+     Backgrounds are subtle tints; text is always neutral high-contrast */
+  --diff-red-bg: #2a1215;
+  --diff-red-bg-highlight: #3d1a1e;
+  --diff-red-accent: #f85149;
+  --diff-red-border: #f8514966;
+  --diff-green-bg: #0f2318;
+  --diff-green-bg-highlight: #163d28;
+  --diff-green-accent: #3fb950;
+  --diff-green-border: #3fb95066;
+
+  /* Text colors - all body text uses neutral high-contrast colors */
+  --text-primary: #e6edf3;
+  --text-secondary: #b1bac4;
+  --text-tertiary: #8b949e;
+  --text-muted: #6e7681;
+  --text-link: #58a6ff;
+  --text-accent: #d2a8ff;
+
+  /* Typography */
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.8125rem;
+  --font-size-base: 0.9375rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.5rem;
+  --font-size-2xl: 2rem;
+  --font-size-3xl: 2.75rem;
+  --line-height-tight: 1.3;
+  --line-height-normal: 1.6;
+  --line-height-relaxed: 1.8;
+
+  /* Spacing */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+
+  /* Layout */
+  --sidebar-width: 260px;
+  --content-max-width: 960px;
+  --tab-height: 38px;
+  --header-height: 40px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+}
+
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+  overflow-x: hidden;
+}
+
+a { color: var(--text-link); text-decoration: none; transition: color var(--transition-fast); }
+a:hover { text-decoration: underline; }
+::selection { background: #264f78; color: #fff; }
+
+/* Skip nav for accessibility */
+.skip-nav {
+  position: absolute;
+  top: -100%;
+  left: var(--space-md);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  z-index: 1000;
+  font-size: var(--font-size-sm);
+}
+.skip-nav:focus { top: var(--space-sm); }
+
+/* ============================================================
+   LAYOUT: IDE-STYLE SHELL
+   ============================================================ */
+/* Splash screen */
+#splash {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: #111; z-index: 9999; overflow: hidden;
+  transition: opacity 0.8s ease;
+}
+#splash.fade-out { opacity: 0; pointer-events: none; }
+#splash-container {
+  position: absolute; top: 50%; left: 50%;
+  font-family: 'Courier New', monospace;
+  font-size: 7px; line-height: 7.5px; letter-spacing: 1px;
+}
+#splash .p {
+  position: absolute; will-change: transform; white-space: pre; pointer-events: none;
+}
+#splash-enter {
+  position: absolute; bottom: 80px; left: 120px; z-index: 2;
+  font-family: 'Courier New', monospace; font-size: 14px;
+  color: #e6edf3; background: rgba(17,17,17,0.7); border: 1px solid #444;
+  padding: 12px 24px; cursor: pointer; letter-spacing: 1px;
+  transition: border-color 0.3s, color 0.3s, opacity 1s ease;
+  opacity: 0; pointer-events: none;
+}
+#splash-enter.visible { opacity: 1; pointer-events: auto; }
+#splash-enter:hover { border-color: #58a6ff; color: #58a6ff; }
+#splash-enter.pulse {
+  animation: splash-pulse 2s ease-in-out infinite;
+}
+@keyframes splash-pulse {
+  0%, 100% { border-color: #444; }
+  50% { border-color: #58a6ff; }
+}
+#splash-copyright {
+  position: absolute; bottom: 88px; right: 120px; z-index: 2;
+  font-family: 'Courier New', monospace; font-size: 12px;
+  color: #555; background: rgba(17,17,17,0.7); padding: 8px 16px;
+  transition: opacity 1s ease; opacity: 0;
+}
+#splash-copyright.visible { opacity: 1; }
+
+.app-shell { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+/* Title bar */
+.title-bar {
+  display: flex; align-items: center; height: var(--header-height);
+  background: var(--bg-tertiary); border-bottom: 1px solid var(--border-primary);
+  padding: 0 var(--space-md); flex-shrink: 0; -webkit-app-region: drag;
+}
+.title-bar__dots { display: flex; gap: 8px; margin-right: var(--space-lg); }
+.title-bar__dot { width: 12px; height: 12px; border-radius: 50%; }
+.title-bar__dot--close { background: #f85149; }
+.title-bar__dot--minimize { background: #d29922; }
+.title-bar__dot--maximize { background: #3fb950; }
+.title-bar__title { font-size: var(--font-size-sm); color: var(--text-tertiary); flex: 1; text-align: center; }
+.title-bar__title strong { color: var(--text-primary); }
+
+.main-layout { display: flex; flex: 1; overflow: hidden; }
+
+/* ============================================================
+   SIDEBAR: FILE TREE
+   ============================================================ */
+.sidebar {
+  width: var(--sidebar-width); background: var(--bg-secondary);
+  border-right: 1px solid var(--border-primary);
+  display: flex; flex-direction: column; flex-shrink: 0;
+  overflow-y: auto; overflow-x: hidden;
+}
+.sidebar__header {
+  padding: var(--space-sm) var(--space-md); font-size: var(--font-size-xs);
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em;
+  border-bottom: 1px solid var(--border-secondary);
+  position: sticky; top: 0; background: var(--bg-secondary); z-index: 2;
+}
+.file-tree { list-style: none; padding: var(--space-sm) 0; font-size: var(--font-size-sm); }
+.file-tree__item {
+  display: flex; align-items: center; padding: 4px var(--space-md);
+  cursor: pointer; color: var(--text-tertiary); position: relative;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  white-space: nowrap; user-select: none;
+}
+.file-tree__item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.file-tree__item--active { background: var(--bg-tertiary); color: var(--text-primary); }
+.file-tree__item--active::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 2px; background: var(--border-accent);
+}
+.file-tree__icon {
+  width: 16px; height: 16px; margin-right: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 14px;
+}
+.file-tree__folder { padding-left: calc(var(--space-md) + 16px); }
+.file-tree__divider { height: 1px; background: var(--border-secondary); margin: var(--space-sm) var(--space-md); }
+
+.sidebar__stats {
+  margin-top: auto; padding: var(--space-md); border-top: 1px solid var(--border-secondary);
+}
+.sidebar__stat {
+  display: flex; justify-content: space-between; padding: 3px 0;
+  font-size: var(--font-size-xs); color: var(--text-muted);
+}
+.sidebar__stat-value { color: var(--diff-green-accent); font-weight: 600; }
+
+/* ============================================================
+   TAB BAR
+   ============================================================ */
+.tab-bar {
+  display: flex; height: var(--tab-height); background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
+  overflow-x: auto; flex-shrink: 0; scrollbar-width: none;
+}
+.tab-bar::-webkit-scrollbar { display: none; }
+
+.tab {
+  display: flex; align-items: center; padding: 0 var(--space-lg);
+  font-size: var(--font-size-sm); color: var(--text-tertiary);
+  background: var(--bg-secondary); border-right: 1px solid var(--border-primary);
+  cursor: pointer; white-space: nowrap; position: relative; user-select: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.tab:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+.tab--active { background: var(--bg-primary); color: var(--text-primary); }
+.tab--active::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0;
+  height: 2px; background: var(--border-accent);
+}
+.tab__icon { margin-right: 6px; font-size: 14px; }
+.tab__modified { width: 8px; height: 8px; border-radius: 50%; background: #d29922; margin-left: 8px; }
+
+/* ============================================================
+   CONTENT AREA
+   ============================================================ */
+.content-area { flex: 1; overflow-y: auto; overflow-x: hidden; scroll-behavior: smooth; }
+
+.content-panel {
+  display: none; padding: var(--space-2xl) var(--space-xl);
+  max-width: var(--content-max-width); margin: 0 auto;
+  animation: fadeIn 0.3s ease;
+}
+.content-panel--active { display: block; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   SECTION HEADERS
+   ============================================================ */
+.section-header {
+  display: flex; align-items: center; gap: var(--space-md);
+  margin-bottom: var(--space-xl); padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--border-primary);
+}
+.section-header__version {
+  font-size: var(--font-size-xs); color: var(--text-accent);
+  background: #2d1b4e; padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 600;
+}
+.section-header__title {
+  font-family: var(--font-sans); font-size: var(--font-size-xl);
+  font-weight: 600; color: var(--text-primary);
+}
+.section-header__path {
+  font-size: var(--font-size-sm); color: var(--text-muted); margin-left: auto;
+}
+
+/* ============================================================
+   HERO SECTION
+   ============================================================ */
+.hero { padding: var(--space-3xl) 0 var(--space-2xl); }
+
+.hero__badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--font-size-xs); color: var(--text-primary);
+  background: var(--diff-green-bg); border: 1px solid var(--diff-green-border);
+  padding: 4px 12px; border-radius: 999px; margin-bottom: var(--space-lg);
+}
+.hero__badge::before {
+  content: ''; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--diff-green-accent); animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+
+.hero__name {
+  font-family: var(--font-sans); font-size: var(--font-size-3xl);
+  font-weight: 700; color: var(--text-primary);
+  line-height: var(--line-height-tight); margin-bottom: var(--space-md);
+}
+.hero__subtitle {
+  font-size: var(--font-size-lg); color: var(--text-secondary);
+  margin-bottom: var(--space-md); max-width: 640px; font-family: var(--font-sans);
+  line-height: var(--line-height-normal);
+}
+.hero__explainer {
+  font-size: var(--font-size-sm); color: var(--text-muted);
+  margin-bottom: var(--space-2xl); font-style: italic;
+}
+
+/* ============================================================
+   DIFF BLOCKS (used only where genuine before/after exists)
+   ============================================================ */
+.diff-block {
+  background: var(--bg-secondary); border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); overflow: hidden; margin-bottom: var(--space-xl);
+}
+.diff-block__header {
+  display: flex; align-items: center; gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md); background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-primary); font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+}
+.diff-block__filename { color: var(--text-primary); font-weight: 600; }
+.diff-block__stats { margin-left: auto; display: flex; gap: var(--space-sm); font-size: var(--font-size-xs); }
+.diff-block__additions { color: var(--diff-green-accent); }
+.diff-block__deletions { color: var(--diff-red-accent); }
+
+.diff-line {
+  display: flex; padding: 2px var(--space-md); font-size: var(--font-size-sm);
+  line-height: 1.7; border-left: 3px solid transparent;
+}
+/* FIXED: Use neutral text colors on colored backgrounds for WCAG AA compliance */
+.diff-line--removed {
+  background: var(--diff-red-bg); border-left-color: var(--diff-red-accent);
+  color: var(--text-secondary); border-left-style: dashed;
+}
+.diff-line--added {
+  background: var(--diff-green-bg); border-left-color: var(--diff-green-accent);
+  color: var(--text-primary); border-left-style: solid;
+}
+.diff-line--context { color: var(--text-tertiary); }
+.diff-line--header { color: var(--text-accent); background: #1c1236; font-style: italic; }
+
+.diff-line__number {
+  width: 48px; flex-shrink: 0; color: var(--text-muted);
+  text-align: right; padding-right: var(--space-md);
+  user-select: none; font-size: var(--font-size-xs);
+}
+.diff-line__prefix {
+  width: 20px; flex-shrink: 0; user-select: none; font-weight: 700;
+}
+/* Prefix colors are accent; content text stays neutral */
+.diff-line--removed .diff-line__prefix { color: var(--diff-red-accent); }
+.diff-line--added .diff-line__prefix { color: var(--diff-green-accent); }
+
+.diff-line__content { flex: 1; white-space: pre-wrap; word-break: break-word; }
+
+/* ============================================================
+   STATS BAR
+   ============================================================ */
+.stats-bar {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1px; background: var(--border-primary); border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); overflow: hidden; margin: var(--space-2xl) 0;
+}
+.stat-cell {
+  background: var(--bg-secondary); padding: var(--space-lg) var(--space-md);
+  text-align: center; transition: background var(--transition-fast);
+}
+.stat-cell:hover { background: var(--bg-tertiary); }
+.stat-cell__value {
+  font-size: var(--font-size-xl); font-weight: 700;
+  color: var(--diff-green-accent); display: block; font-family: var(--font-sans);
+}
+.stat-cell__label {
+  font-size: var(--font-size-xs); color: var(--text-muted); margin-top: 4px; display: block;
+}
+
+/* ============================================================
+   MARKDOWN RENDERED CONTENT (for non-diff panels)
+   ============================================================ */
+.md-content {
+  font-family: var(--font-sans);
+  color: var(--text-secondary);
+  line-height: var(--line-height-relaxed);
+}
+.md-content h2 {
+  font-size: var(--font-size-xl); font-weight: 700; color: var(--text-primary);
+  margin: var(--space-2xl) 0 var(--space-md); padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border-primary);
+}
+.md-content h3 {
+  font-size: var(--font-size-lg); font-weight: 600; color: var(--text-primary);
+  margin: var(--space-xl) 0 var(--space-sm);
+}
+.md-content h4 {
+  font-size: var(--font-size-base); font-weight: 600; color: var(--text-primary);
+  margin: var(--space-lg) 0 var(--space-xs);
+}
+.md-content p {
+  margin-bottom: var(--space-md); color: var(--text-secondary);
+}
+.md-content ul, .md-content ol {
+  margin-bottom: var(--space-md); padding-left: var(--space-xl);
+}
+.md-content li {
+  margin-bottom: var(--space-xs); color: var(--text-secondary);
+}
+.md-content strong { color: var(--text-primary); }
+
+.md-content blockquote {
+  margin: var(--space-lg) 0; padding: var(--space-md) var(--space-lg);
+  border-left: 3px solid var(--text-accent); background: var(--bg-secondary);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  font-style: italic; color: var(--text-secondary);
+}
+.md-content blockquote p { margin-bottom: 0; }
+
+.md-content code {
+  font-family: var(--font-mono); font-size: var(--font-size-sm);
+  background: var(--bg-tertiary); padding: 2px 6px;
+  border-radius: var(--radius-sm); color: var(--text-primary);
+}
+
+
+/* ============================================================
+   PROJECT CARDS - FEATURED (large, with diff)
+   ============================================================ */
+.project-featured {
+  background: var(--bg-secondary); border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); margin-bottom: var(--space-2xl);
+  overflow: hidden; transition: border-color var(--transition-normal);
+}
+.project-featured:hover { border-color: var(--border-accent); }
+
+.project-featured__header {
+  display: flex; align-items: center; gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg); background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-primary);
+}
+.project-featured__name { font-size: var(--font-size-base); font-weight: 600; color: var(--text-primary); }
+
+.project-featured__body {
+  padding: var(--space-lg);
+  font-family: var(--font-sans);
+}
+.project-featured__body p {
+  font-size: var(--font-size-sm); color: var(--text-secondary);
+  line-height: var(--line-height-normal); margin-bottom: var(--space-md);
+}
+.project-featured__body strong { color: var(--text-primary); }
+
+/* Split diff inside featured project */
+.project-diff {
+  display: grid; grid-template-columns: 1fr 1fr;
+  border-top: 1px solid var(--border-primary);
+}
+.project-diff__before, .project-diff__after {
+  padding: var(--space-lg);
+}
+.project-diff__before {
+  background: var(--diff-red-bg); border-right: 1px solid var(--border-primary);
+  border-left: 3px dashed var(--diff-red-accent);
+}
+.project-diff__after {
+  background: var(--diff-green-bg);
+  border-left: 3px solid var(--diff-green-accent);
+}
+.project-diff__label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: var(--font-size-xs); text-transform: uppercase;
+  letter-spacing: 0.1em; margin-bottom: var(--space-md); font-weight: 700;
+  font-family: var(--font-mono);
+}
+/* Labels use accent color; text body uses neutral */
+.project-diff__label--before { color: var(--diff-red-accent); }
+.project-diff__label--after { color: var(--diff-green-accent); }
+.project-diff__text {
+  font-family: var(--font-sans); font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal); color: var(--text-secondary);
+}
+
+.project-featured__insight {
+  padding: var(--space-md) var(--space-lg);
+  border-top: 1px solid var(--border-primary); background: var(--bg-secondary);
+  font-size: var(--font-size-sm); display: flex; gap: var(--space-sm); align-items: flex-start;
+}
+.project-featured__insight-label { color: var(--text-accent); font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+.project-featured__insight-text { color: var(--text-secondary); font-family: var(--font-sans); }
+
+/* ============================================================
+   PROJECT CARDS - MEDIUM (internal tools)
+   ============================================================ */
+.project-medium {
+  background: var(--bg-secondary); border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); margin-bottom: var(--space-lg);
+  overflow: hidden; transition: border-color var(--transition-normal);
+}
+.project-medium:hover { border-color: var(--border-accent); }
+
+.project-medium__header {
+  display: flex; align-items: center; gap: var(--space-md);
+  padding: var(--space-sm) var(--space-lg); background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-primary);
+}
+.project-medium__name { font-size: var(--font-size-sm); font-weight: 600; color: var(--text-primary); }
+.project-medium__body {
+  padding: var(--space-md) var(--space-lg);
+  font-family: var(--font-sans); font-size: var(--font-size-sm);
+  color: var(--text-secondary); line-height: var(--line-height-normal);
+}
+.project-medium__body strong { color: var(--text-primary); }
+.project-medium__outcome {
+  padding: var(--space-sm) var(--space-lg) var(--space-md);
+  font-size: var(--font-size-sm); font-family: var(--font-mono);
+  color: var(--text-accent);
+}
+
+/* ============================================================
+   PROJECT CARDS - COMPACT (building aptitude)
+   ============================================================ */
+.project-compact {
+  display: flex; align-items: center; gap: var(--space-md);
+  background: var(--bg-secondary); border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); padding: var(--space-md) var(--space-lg);
+  margin-bottom: var(--space-sm); transition: border-color var(--transition-normal);
+}
+.project-compact:hover { border-color: var(--border-accent); }
+.project-compact__name { font-size: var(--font-size-sm); font-weight: 600; color: var(--text-primary); white-space: nowrap; }
+.project-compact__desc {
+  font-size: var(--font-size-sm); color: var(--text-tertiary);
+  font-family: var(--font-sans); flex: 1;
+}
+.project-compact__link {
+  font-size: var(--font-size-xs); color: var(--text-link); white-space: nowrap;
+}
+
+/* ============================================================
+   EXPERIENCE - CHANGELOG
+   ============================================================ */
+.changelog-entry { margin-bottom: var(--space-2xl); position: relative; }
+.changelog-entry::before {
+  content: ''; position: absolute; left: 7px; top: 28px; bottom: -24px;
+  width: 2px; background: var(--border-primary);
+}
+.changelog-entry:last-child::before { display: none; }
+
+.changelog-version { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-md); }
+.changelog-version__dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--bg-tertiary); border: 2px solid var(--border-accent);
+  flex-shrink: 0; position: relative; z-index: 1;
+}
+.changelog-version__tag {
+  font-size: var(--font-size-sm); font-weight: 700; color: var(--text-accent);
+  background: #2d1b4e; padding: 2px 10px; border-radius: var(--radius-sm);
+}
+.changelog-version__title {
+  font-family: var(--font-sans); font-size: var(--font-size-base);
+  font-weight: 600; color: var(--text-primary);
+}
+.changelog-version__period { font-size: var(--font-size-xs); color: var(--text-muted); margin-left: auto; }
+
+.changelog-body { margin-left: 32px; padding-left: var(--space-lg); }
+.changelog-section { margin-bottom: var(--space-md); }
+.changelog-section__label {
+  font-size: var(--font-size-xs); text-transform: uppercase;
+  letter-spacing: 0.05em; font-weight: 700; margin-bottom: var(--space-xs);
+}
+.changelog-section__label--added { color: var(--diff-green-accent); }
+.changelog-section__label--changed { color: #d29922; }
+.changelog-section__label--fixed { color: var(--text-link); }
+.changelog-section__label--result { color: var(--text-accent); }
+
+.changelog-item {
+  font-size: var(--font-size-sm); color: var(--text-secondary); padding: 2px 0;
+  padding-left: var(--space-md); position: relative; font-family: var(--font-sans);
+}
+.changelog-item::before { content: '-'; position: absolute; left: 0; color: var(--text-muted); }
+.changelog-item--result { font-weight: 600; color: var(--text-accent); }
+.changelog-item--result::before { content: '=>'; color: var(--text-accent); left: -4px; }
+
+/* ============================================================
+   TESTIMONIALS - CODE REVIEW APPROVALS
+   ============================================================ */
+.review-card {
+  background: var(--bg-secondary); border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); margin-bottom: var(--space-lg);
+  overflow: hidden; transition: border-color var(--transition-normal);
+}
+.review-card:hover { border-color: var(--diff-green-border); }
+
+.review-card__header {
+  display: flex; align-items: center; gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md); background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-primary); font-size: var(--font-size-sm);
+}
+.review-card__status { color: #3fb950; font-size: 16px; font-weight: 700; }
+.review-card__reviewer { color: var(--text-primary); font-weight: 600; }
+.review-card__role { color: var(--text-muted); font-size: var(--font-size-xs); }
+.review-card__body {
+  padding: var(--space-md) var(--space-lg);
+  font-family: var(--font-sans); font-size: var(--font-size-sm);
+  color: var(--text-secondary); line-height: var(--line-height-normal); font-style: italic;
+}
+
+
+/* ============================================================
+   CONTACT / CTA
+   ============================================================ */
+.contact-section { padding: var(--space-3xl) 0; }
+.contact-section__heading {
+  font-family: var(--font-sans); font-size: var(--font-size-2xl);
+  font-weight: 700; color: var(--text-primary); margin-bottom: var(--space-md);
+}
+.contact-section__sub {
+  font-size: var(--font-size-base); color: var(--text-secondary);
+  margin-bottom: var(--space-xl); font-family: var(--font-sans);
+  max-width: 600px; line-height: var(--line-height-normal);
+}
+
+.consulting-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-md); margin-bottom: var(--space-2xl);
+}
+.consulting-card {
+  background: var(--bg-secondary); border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md); padding: var(--space-lg);
+}
+.consulting-card__title {
+  font-family: var(--font-sans); font-size: var(--font-size-sm);
+  font-weight: 600; color: var(--text-primary); margin-bottom: var(--space-xs);
+}
+.consulting-card__desc {
+  font-family: var(--font-sans); font-size: var(--font-size-xs);
+  color: var(--text-tertiary); line-height: var(--line-height-normal);
+}
+
+
+.connect-btn {
+  display: inline-flex; align-items: center; gap: var(--space-sm);
+  padding: 12px 28px; background: #238636; color: #fff;
+  font-family: var(--font-mono); font-size: var(--font-size-sm);
+  font-weight: 600; border: 1px solid #2ea043;
+  border-radius: var(--radius-md); cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+  text-decoration: none; margin-bottom: var(--space-xl);
+}
+.connect-btn:hover { background: #2ea043; transform: translateY(-1px); text-decoration: none; }
+
+/* ============================================================
+   STATUS BAR
+   ============================================================ */
+.status-bar {
+  display: flex; align-items: center; height: 24px;
+  padding: 0 var(--space-md); background: #0969da;
+  font-size: var(--font-size-xs); color: #fff; flex-shrink: 0; gap: var(--space-lg);
+}
+.status-bar__item { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.status-bar__right { margin-left: auto; display: flex; gap: var(--space-lg); }
+
+/* ============================================================
+   SCROLL ANIMATION
+   ============================================================ */
+.reveal {
+  opacity: 0; transform: translateY(16px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.reveal--visible { opacity: 1; transform: translateY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } }
+  .content-panel { animation: none; }
+}
+
+/* ============================================================
+   MOBILE MENU TOGGLE
+   ============================================================ */
+.mobile-menu-btn {
+  display: none; background: none; border: none;
+  color: var(--text-secondary); font-size: 18px; cursor: pointer; padding: 4px;
+}
+
+.mobile-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  z-index: 99; display: none;
+}
+.mobile-overlay--visible { display: block; }
+
+/* ============================================================
+   MOBILE RESPONSIVE
+   ============================================================ */
+@media (max-width: 768px) {
+  .mobile-menu-btn { display: flex; align-items: center; }
+  .sidebar { display: none; }
+  .sidebar--mobile-open {
+    display: flex; position: fixed;
+    top: var(--header-height); left: 0; bottom: 24px;
+    width: 280px; z-index: 100;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+  }
+  .title-bar__dots { display: none; }
+  .content-panel { padding: var(--space-lg) var(--space-md); }
+  .hero__name { font-size: var(--font-size-2xl); }
+
+  .project-diff { grid-template-columns: 1fr; }
+  .project-diff__before { border-right: none; border-bottom: 1px solid var(--border-primary); }
+
+  .diff-line__number { width: 32px; font-size: 10px; }
+  .section-header { flex-wrap: wrap; }
+  .section-header__path { margin-left: 0; width: 100%; order: -1; }
+
+  .changelog-version { flex-wrap: wrap; }
+  .changelog-version__period { margin-left: 0; width: 100%; padding-left: 32px; }
+
+  .stats-bar { grid-template-columns: repeat(2, 1fr); }
+  .tab { padding: 0 var(--space-md); font-size: var(--font-size-xs); }
+  .status-bar { overflow-x: auto; }
+  .consulting-grid { grid-template-columns: 1fr; }
+
+  .project-compact { flex-direction: column; align-items: flex-start; }
+}
+
+@media (max-width: 480px) {
+  .stats-bar { grid-template-columns: 1fr 1fr; }
+  .hero__name { font-size: 1.6rem; }
+  .diff-line { font-size: var(--font-size-xs); }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 5px; border: 2px solid var(--bg-primary); }
+::-webkit-scrollbar-thumb:hover { background: #484f58; }
+
+/* Artifact placeholders */
+.artifact-placeholder {
+  border: 2px dashed var(--border-primary);
+  border-radius: var(--radius-md);
+  padding: var(--space-2xl) var(--space-lg);
+  margin: var(--space-lg) 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  background: var(--bg-secondary);
+  min-height: 180px;
+}
+.artifact-placeholder__icon {
+  font-size: 2.5rem;
+  opacity: 0.5;
+}
+.artifact-placeholder__label {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  text-align: center;
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     SPLASH SCREEN - ASCII Particle Assembly
+     ============================================================ -->
+<div id="splash">
+  <div id="splash-container">
+    <button id="splash-enter">Meet Uri Kogan</button>
+    <div id="splash-copyright">(c) 2026</div>
+  </div>
+</div>
+
+<!-- Skip navigation for accessibility -->
+<a href="#main-content" class="skip-nav">Skip to main content</a>
+
+<!-- ============================================================
+     APP SHELL - IDE Chrome
+     ============================================================ -->
+<div class="app-shell" style="display:none;" role="application" aria-label="Portfolio website styled as a code editor">
+
+  <!-- Title Bar -->
+  <header class="title-bar">
+    <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle navigation menu" aria-expanded="false">
+      <span>=</span>
+    </button>
+    <div class="title-bar__dots" aria-hidden="true">
+      <div class="title-bar__dot title-bar__dot--close"></div>
+      <div class="title-bar__dot title-bar__dot--minimize"></div>
+      <div class="title-bar__dot title-bar__dot--maximize"></div>
+    </div>
+    <div class="title-bar__title">
+      <strong>uri-kogan</strong> &mdash; ~/edgewood-park
+    </div>
+  </header>
+
+  <!-- Main Layout -->
+  <div class="main-layout">
+
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay" aria-hidden="true"></div>
+
+    <!-- Sidebar: File Tree -->
+    <nav class="sidebar" id="sidebar" aria-label="File navigation">
+      <div class="sidebar__header">Explorer</div>
+      <ul class="file-tree" role="tree">
+        <li class="file-tree__item file-tree__item--active" data-tab="hero" role="treeitem" tabindex="0" aria-selected="true">
+          <span class="file-tree__icon" aria-hidden="true">~</span>
+          uri-kogan.md
+        </li>
+        <li class="file-tree__item" data-tab="craft" role="treeitem" tabindex="0">
+          <span class="file-tree__icon" aria-hidden="true">~</span>
+          how-i-work.md
+        </li>
+        <li class="file-tree__item" data-tab="projects" role="treeitem" tabindex="0">
+          <span class="file-tree__icon" aria-hidden="true">&gt;</span>
+          projects/
+        </li>
+        <li class="file-tree__item file-tree__folder" data-tab="projects" data-scroll="project-stanford" role="treeitem" tabindex="0">
+          <span class="file-tree__icon" aria-hidden="true">*</span>
+          childrens-hospital.md
+        </li>
+        <li class="file-tree__item file-tree__folder" data-tab="projects" data-scroll="project-qualcomm" role="treeitem" tabindex="0">
+          <span class="file-tree__icon" aria-hidden="true">*</span>
+          tech-campus-hq.md
+        </li>
+        <li class="file-tree__item file-tree__folder" data-tab="projects" data-scroll="project-competition" role="treeitem" tabindex="0">
+          <span class="file-tree__icon" aria-hidden="true">~</span>
+          competition-bot.md
+        </li>
+        <li class="file-tree__item file-tree__folder" data-tab="projects" data-scroll="project-gonggpt" role="treeitem" tabindex="0">
+          <span class="file-tree__icon" aria-hidden="true">~</span>
+          gonggpt.md
+        </li>
+        <li class="file-tree__item file-tree__folder" data-tab="projects" data-scroll="project-claude-workflows" role="treeitem" tabindex="0">
+          <span class="file-tree__icon" aria-hidden="true">~</span>
+          claude-workflows.md
+        </li>
+        <li class="file-tree__item file-tree__folder" data-tab="projects" data-scroll="project-findcpa" role="treeitem" tabindex="0">
+          <span class="file-tree__icon" aria-hidden="true">~</span>
+          findcpa.md
+        </li>
+        <li class="file-tree__divider" role="separator"></li>
+        <li class="file-tree__item" data-tab="experience" role="treeitem" tabindex="0">
+          <span class="file-tree__icon" aria-hidden="true">~</span>
+          CHANGELOG.md
+        </li>
+        <li class="file-tree__item" data-tab="testimonials" role="treeitem" tabindex="0">
+          <span class="file-tree__icon" aria-hidden="true">~</span>
+          reviews/
+        </li>
+        <li class="file-tree__item" data-tab="contact" role="treeitem" tabindex="0">
+          <span class="file-tree__icon" aria-hidden="true">~</span>
+          CONTRIBUTING.md
+        </li>
+      </ul>
+
+    </nav>
+
+    <!-- Content Area -->
+    <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+
+      <!-- Scrollable content -->
+      <main class="content-area" id="contentArea" id="main-content">
+
+        <!-- ========================================
+             PANEL: HERO (uri-kogan.md)
+             ======================================== -->
+        <div class="content-panel content-panel--active" id="panel-hero" role="tabpanel">
+
+          <div class="hero">
+            <div class="hero__badge" aria-label="Status: Available for consulting and advisory">Available for consulting and advisory</div>
+
+            <h1 class="hero__name">Uri Kogan</h1>
+            <p class="hero__subtitle">Product leader who builds. 15 years of strategy, now shipping working software with agentic engineering.</p>
+            <p class="hero__explainer">Product leader who builds &mdash; visualized as a code diff showing transformation</p>
+
+            <!-- Hero diff block -->
+            <div class="diff-block" aria-label="Highlights">
+              <div class="diff-block__header">
+                <span class="diff-block__filename">highlights.diff</span>
+                <div class="diff-block__stats">
+                  <span class="diff-block__additions" aria-label="3 additions">+3</span>
+                  <span class="diff-block__deletions" aria-label="1 deletion">-1</span>
+                </div>
+              </div>
+              <div class="diff-block__body">
+                <div class="diff-line diff-line--removed" aria-label="Removed line">
+                  <span class="diff-line__number">1</span>
+                  <span class="diff-line__prefix">-</span>
+                  <span class="diff-line__content">Approach: Define requirements, hand to engineering, wait</span>
+                </div>
+                <div class="diff-line diff-line--added" aria-label="Added line">
+                  <span class="diff-line__number">1</span>
+                  <span class="diff-line__prefix">+</span>
+                  <span class="diff-line__content">Approach: Build working software &rarr; customer evidence &rarr; proven requirements</span>
+                </div>
+                <div class="diff-line diff-line--context">
+                  <span class="diff-line__number">2</span>
+                  <span class="diff-line__prefix"></span>
+                  <span class="diff-line__content"></span>
+                </div>
+                <div class="diff-line diff-line--added" aria-label="Added line">
+                  <span class="diff-line__number">3</span>
+                  <span class="diff-line__prefix">+</span>
+                  <span class="diff-line__content">Decades of GTM across buyers, sellers, and business models &mdash; I know how they think</span>
+                </div>
+                <div class="diff-line diff-line--added" aria-label="Added line">
+                  <span class="diff-line__number">4</span>
+                  <span class="diff-line__prefix">+</span>
+                  <span class="diff-line__content">From competitive strategy to working prototypes, no handoff required</span>
+                </div>
+                <div class="diff-line diff-line--added" aria-label="Added line">
+                  <span class="diff-line__number">5</span>
+                  <span class="diff-line__prefix">+</span>
+                  <span class="diff-line__content">Build to discover: working software surfaces what planning never could</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Stats bar -->
+            <div class="stats-bar" aria-label="Key metrics">
+              <div class="stat-cell">
+                <span class="stat-cell__value">4</span>
+                <span class="stat-cell__label">Zero-to-one products</span>
+              </div>
+              <div class="stat-cell">
+                <span class="stat-cell__value">2</span>
+                <span class="stat-cell__label">Successful exits</span>
+              </div>
+              <div class="stat-cell">
+                <span class="stat-cell__value">15+</span>
+                <span class="stat-cell__label">Years product leadership</span>
+              </div>
+              <div class="stat-cell">
+                <span class="stat-cell__value">5</span>
+                <span class="stat-cell__label">VP+ roles</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ========================================
+             PANEL: PM CRAFT (how-i-work.md)
+             ======================================== -->
+        <div class="content-panel" id="panel-craft" role="tabpanel">
+
+          <div class="section-header">
+            <span class="section-header__version">v8.0</span>
+            <h2 class="section-header__title">How I Work</h2>
+            <span class="section-header__path">~/edgewood-park/how-i-work.md</span>
+          </div>
+
+          <div class="md-content">
+
+            <blockquote>
+              <p>Product management is about three things: a product customers love, that your team can deliver, that makes your company successful. AI has given us a powerful new tool, but the job hasn't changed.</p>
+            </blockquote>
+
+            <!-- ---- Customer Intimacy ---- -->
+            <div class="diff-block reveal" style="margin-bottom: var(--space-xl);">
+              <div class="diff-block__header">
+                <span class="diff-block__filename">customer-intimacy.diff</span>
+              </div>
+              <div class="diff-block__body">
+                <div class="diff-line diff-line--removed"><span class="diff-line__prefix">-</span><span class="diff-line__content">Research users as a phase. Conduct interviews. Write report. Move on.</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Customer relationships as ongoing practice. Build, ship, observe, expand.</span></div>
+                <div class="diff-line diff-line--context"><span class="diff-line__prefix"></span><span class="diff-line__content"></span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Decades of B2B GTM: how buyers evaluate, how sellers sell, how deals close</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">CFOs, AP clerks, facilities engineers, marketers, creative supply chain</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Vendor timing errors, 24/7 HVAC waste &mdash; discovered by building, not surveying</span></div>
+              </div>
+            </div>
+
+            <!-- ---- Cross-Functional Leadership ---- -->
+            <div class="diff-block reveal" style="margin-bottom: var(--space-xl);">
+              <div class="diff-block__header">
+                <span class="diff-block__filename">cross-functional-leadership.diff</span>
+              </div>
+              <div class="diff-block__body">
+                <div class="diff-line diff-line--removed"><span class="diff-line__prefix">-</span><span class="diff-line__content">Stay in your lane. Product writes specs. Engineering builds. Marketing markets.</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Do whatever the business needs. Fill gaps. Remove blockers. Translate between worlds.</span></div>
+                <div class="diff-line diff-line--context"><span class="diff-line__prefix"></span><span class="diff-line__content"></span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Became the domain expert when no one else would</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Led marketing through a leadership vacuum while shipping PM deliverables</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Built customer-facing tools when engineering was focused on infrastructure</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">CEO strategy sessions. Sales enablement. Engineering handoffs with proven requirements.</span></div>
+              </div>
+            </div>
+
+            <!-- ---- Build to Discover ---- -->
+            <div class="diff-block reveal" style="margin-bottom: var(--space-xl);">
+              <div class="diff-block__header">
+                <span class="diff-block__filename">build-to-discover.diff</span>
+              </div>
+              <div class="diff-block__body">
+                <div class="diff-line diff-line--removed"><span class="diff-line__prefix">-</span><span class="diff-line__content">Write requirements. Hand to engineering. Wait. Hope you got it right.</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Build working software. Ship to real customers. Let the data tell you what's real.</span></div>
+                <div class="diff-line diff-line--context"><span class="diff-line__prefix"></span><span class="diff-line__content"></span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Agentic engineering: test hypotheses before committing engineering time</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Not throwaway prototypes &mdash; tools that serve real customers, generate real evidence</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Working software surfaces the gap between what you assumed and what's real</span></div>
+              </div>
+            </div>
+
+            <!-- ---- From Business Strategy to Shipping Code ---- -->
+            <div class="diff-block reveal" style="margin-bottom: var(--space-xl);">
+              <div class="diff-block__header">
+                <span class="diff-block__filename">business-strategy-to-shipping-code.diff</span>
+              </div>
+              <div class="diff-block__body">
+                <div class="diff-line diff-line--removed"><span class="diff-line__prefix">-</span><span class="diff-line__content">Analyze the market OR build the product. Pick one.</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Analyze the market AND build the product. No handoff required.</span></div>
+                <div class="diff-line diff-line--context"><span class="diff-line__prefix"></span><span class="diff-line__content"></span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Zooming out: competitive positioning at the business model level</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Where incumbents are structurally constrained &mdash; build around what they can't do</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Zooming in: working software, data discoveries, architecture driven by the customer</span></div>
+              </div>
+            </div>
+
+            <!-- ---- Engineering Collaboration ---- -->
+            <div class="diff-block reveal" style="margin-bottom: var(--space-xl);">
+              <div class="diff-block__header">
+                <span class="diff-block__filename">engineering-collaboration.diff</span>
+              </div>
+              <div class="diff-block__body">
+                <div class="diff-line diff-line--removed"><span class="diff-line__prefix">-</span><span class="diff-line__content">PM who builds = threat to engineering</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">PM who builds = customer evidence that de-risks engineering investment</span></div>
+                <div class="diff-line diff-line--context"><span class="diff-line__prefix"></span><span class="diff-line__content"></span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Fill the gap: engineering does foundational work, PM builds 0-1 customer tools</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Prototypes become proven requirements with high-confidence specs</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Match the toolset: configure AI with the team's stack so output is legible</span></div>
+              </div>
+            </div>
+
+            <!-- ---- Trust as the Product ---- -->
+            <div class="diff-block reveal" style="margin-bottom: var(--space-xl);">
+              <div class="diff-block__header">
+                <span class="diff-block__filename">trust-as-the-product.diff</span>
+              </div>
+              <div class="diff-block__body">
+                <div class="diff-line diff-line--removed"><span class="diff-line__prefix">-</span><span class="diff-line__content">Ship fast, add guardrails later</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">If the user doesn't trust the system, the system doesn't matter</span></div>
+                <div class="diff-line diff-line--context"><span class="diff-line__prefix"></span><span class="diff-line__content"></span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Don't collect what you don't need &mdash; PII stripping as trust design (Retirement Advisor)</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Verify AI output systematically &mdash; source verification, eval, scope enforcement (Competition Bot)</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Keep humans in control &mdash; AI informs, humans decide, kill switch always available (ODCV)</span></div>
+              </div>
+            </div>
+
+            <!-- ---- What I Got Wrong ---- -->
+            <div class="diff-block reveal" style="margin-bottom: var(--space-xl);">
+              <div class="diff-block__header">
+                <span class="diff-block__filename">what-i-got-wrong.diff</span>
+              </div>
+              <div class="diff-block__body">
+                <div class="diff-line diff-line--removed"><span class="diff-line__prefix">-</span><span class="diff-line__content">MVP: show the data first, derive insights later</span></div>
+                <div class="diff-line diff-line--removed"><span class="diff-line__prefix">-</span><span class="diff-line__content">Result: neither easy (substantial engineering) nor useful (customers didn't engage)</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Right MVP: the simplest useful insight, not raw telemetry</span></div>
+                <div class="diff-line diff-line--added"><span class="diff-line__prefix">+</span><span class="diff-line__content">Every yes has to be high-conviction. You have to feel the cost, not just know the principle.</span></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ========================================
+             PANEL: PROJECTS (projects/)
+             ======================================== -->
+        <div class="content-panel" id="panel-projects" role="tabpanel">
+
+          <div class="section-header">
+            <span class="section-header__version">v2.0</span>
+            <h2 class="section-header__title">Projects</h2>
+            <span class="section-header__path">~/edgewood-park/projects/</span>
+          </div>
+
+          <!-- ===== FEATURED: Children's Hospital ODCV ===== -->
+          <div class="project-featured reveal" id="project-stanford">
+            <div class="project-featured__header">
+              <span class="project-featured__name">childrens-hospital.md</span>
+            </div>
+            <div class="project-featured__body">
+              <p><strong>Premier West Coast Children's Hospital &mdash; ODCV Data Validation</strong></p>
+              <p>Narrow validation at scale: the same occupancy compliance rule applied across 100+ VAV zones. Built automated Slack reports, HTML timeline viewer, and the core savings calculation engine. TimescaleDB for time-series data handling.</p>
+              <p><strong>Architecture driven by data model:</strong> The hospital's zones were homogeneous &mdash; same rule applied 100 times. This meant a narrow, deep validation engine that could catch deviations reliably at scale.</p>
+              <!-- Placeholder for visual artifact -->
+              <div class="artifact-placeholder reveal" aria-label="Dashboard screenshot placeholder">
+                <div class="artifact-placeholder__icon">[img]</div>
+                <div class="artifact-placeholder__label">Timeline validation dashboard &mdash; screenshot</div>
+              </div>
+            </div>
+            <div class="project-diff" aria-label="Before and after comparison for children's hospital project">
+              <div class="project-diff__before">
+                <div class="project-diff__label project-diff__label--before" aria-label="Before state">&#x2212; Before</div>
+                <p class="project-diff__text">Expected missing data. Assumed the programmed sequence of operations (a very simple timing rule) was implemented correctly by the controls vendor. Trusted that the MSI had done their job.</p>
+              </div>
+              <div class="project-diff__after">
+                <div class="project-diff__label project-diff__label--after" aria-label="After state">+ After</div>
+                <p class="project-diff__text">Data was rarely missing. But the SOO was implemented incorrectly. Vendor completely missed the timing delays (15 min occupied to standby, 5 min standby to occupied). Savings being left on the table. Customer trust shifted from their MSI to us.</p>
+              </div>
+            </div>
+            <div class="project-featured__insight">
+              <span class="project-featured__insight-label">OUTCOME:</span>
+              <span class="project-featured__insight-text">23-30% energy savings demonstrated. Led to a public case study. Expansion discussions now underway across the children's, adult, medical school, and university campuses. Internal reaction to the dashboard: "THIS IS FUCKING AWESOME."</span>
+            </div>
+          </div>
+
+          <!-- ===== FEATURED: Tech Campus HQ ===== -->
+          <div class="project-featured reveal" id="project-qualcomm">
+            <div class="project-featured__header">
+              <span class="project-featured__name">tech-campus-hq.md</span>
+            </div>
+            <div class="project-featured__body">
+              <p><strong>Top Tech Company HQ &mdash; ODCV Commissioning &amp; M&amp;V</strong></p>
+              <p>Comprehensive validation of complexity: 103 heterogeneous BACnet metrics across 7 groups, 3 independent detectors (flatlining, gap, range), composite health scoring system, configurable thresholds per metric type.</p>
+              <p><strong>Architecture driven by data model:</strong> The campus equipment was heterogeneous &mdash; 103 different metrics needing completely different validation logic. This meant a wide, configurable detection engine with per-metric-type thresholds and composite scoring.</p>
+              <!-- Placeholder for visual artifact -->
+              <div class="artifact-placeholder reveal" aria-label="Commissioning dashboard screenshot placeholder">
+                <div class="artifact-placeholder__icon">[img]</div>
+                <div class="artifact-placeholder__label">Health scoring dashboard &mdash; screenshot</div>
+              </div>
+            </div>
+            <div class="project-diff" aria-label="Before and after comparison for tech campus project">
+              <div class="project-diff__before">
+                <div class="project-diff__label project-diff__label--before" aria-label="Before state">&#x2212; Before</div>
+                <p class="project-diff__text">Built initially to validate only operating hours when ODCV was active. Assumed off-hours were not relevant. BMS was delivering 17,700 CFM continuously &mdash; over 3&times; the ASHRAE 62.1 code requirement at full design occupancy.</p>
+              </div>
+              <div class="project-diff__after">
+                <div class="project-diff__label project-diff__label--after" aria-label="After state">+ After</div>
+                <p class="project-diff__text">Expanded data aperture after seeing odd pre-hours behavior. Discovered nights and weekends systems running as if occupied 24/7. 90% OA reduction achieved (96% on weekends). A configuration error that had been bleeding money invisibly.</p>
+              </div>
+            </div>
+            <div class="project-featured__insight">
+              <span class="project-featured__insight-label">OUTCOME:</span>
+              <span class="project-featured__insight-text">27% building-level energy reduction. 4.58 metric tons CO2 avoided. Zero comfort complaints. Customer now considering expansion across their entire campus and other campuses worldwide. Same PM, same domain, radically different architecture than the hospital &mdash; because the data model demanded it.</span>
+            </div>
+          </div>
+
+          <!-- ===== MEDIUM: Competition Bot ===== -->
+
+          <div class="project-medium reveal" id="project-competition">
+            <div class="project-medium__header">
+              <span class="project-medium__name">competition-bot.md</span>
+            </div>
+            <div class="project-medium__body">
+              <p><strong>Multi-agent competitive intelligence platform.</strong> Built rich competitive profiles, battlecards, and comparison matrices. Shared with sales. Their biggest feedback: "How can I use this to respond to a prospect on a call?" Built a chatbot on the validated knowledge corpus covering dozens of competitors.</p>
+              <p><strong>Sequence mattered:</strong> If the chatbot came first, the knowledge corpus and data validation system wouldn't exist. Built an eval system to ensure the chatbot was generating good answers. Discovered the agent was sometimes answering with information beyond its scope &mdash; tightened instructions to enforce boundaries.</p>
+            </div>
+            <div class="project-medium__outcome">=> CEO Alex called it "great potential to accelerate our strategic and GTM efforts."</div>
+          </div>
+
+          <div class="project-medium reveal" id="project-gonggpt">
+            <div class="project-medium__header">
+              <span class="project-medium__name">gonggpt.md</span>
+            </div>
+            <div class="project-medium__body">
+              <p><strong>Voice-of-customer intelligence pipeline.</strong> Originally built for Product to systematically understand customer objections and feature requests from sales calls. 5-stage ETL: ingestion, speaker classification, transcript enrichment, insight extraction, structured output. 11 configuration sheet types for customizable analysis.</p>
+              <p><strong>Cross-functional adoption:</strong> Marketing adopted it as a key input for ABM content generation &mdash; turning real customer objections expressed on calls into targeted content addressing those exact concerns. Became critical infrastructure for understanding VOC across the organization.</p>
+            </div>
+            <div class="project-medium__outcome">=> Product insight + marketing content from the same pipeline. VOC at scale.</div>
+          </div>
+
+
+          <div class="project-compact reveal" id="project-claude-workflows">
+            <span class="project-compact__name">claude-workflows.md</span>
+            <span class="project-compact__desc">Pre-dated Anthropic's CoWork. React + Hono + TypeScript. Permission dialogs with risk stratification, sandboxed execution. Evidence of product sense: saw the same opportunity as Anthropic's product team.</span>
+          </div>
+
+          <div class="project-compact reveal" id="project-findcpa">
+            <span class="project-compact__name">findcpa.md</span>
+            <span class="project-compact__desc">Integrity-first CPA matching marketplace. Guide-over-list design philosophy. Multi-Claude team workflow for development.</span>
+            <a href="https://findcpa.vercel.app" target="_blank" rel="noopener" class="project-compact__link">findcpa.vercel.app &rarr;</a>
+          </div>
+
+        </div>
+
+        <!-- ========================================
+             PANEL: EXPERIENCE (CHANGELOG.md)
+             ======================================== -->
+        <div class="content-panel" id="panel-experience" role="tabpanel">
+
+          <div class="section-header">
+            <span class="section-header__version">CHANGELOG</span>
+            <h2 class="section-header__title">Experience</h2>
+            <span class="section-header__path">~/edgewood-park/CHANGELOG.md</span>
+          </div>
+
+          <!-- v7.0 -->
+          <div class="changelog-entry reveal">
+            <div class="changelog-version">
+              <div class="changelog-version__dot"></div>
+              <span class="changelog-version__tag">v7.0</span>
+              <span class="changelog-version__title">R-Zero &mdash; VP Product &amp; Product Marketing</span>
+              <span class="changelog-version__period">2023 &ndash; Present</span>
+            </div>
+            <div class="changelog-body">
+              <div class="changelog-section">
+                <div class="changelog-section__label changelog-section__label--added">Added</div>
+                <div class="changelog-item">ODCV pilot program: theory to deployment to proven value across 3 customer sites (23-30% energy savings)</div>
+                <div class="changelog-item">Pioneered agentic engineering across the company (Claude Code)</div>
+                <div class="changelog-item">AI content pipeline: customer objections to targeted blog posts (6 in 4 weeks)</div>
+                <div class="changelog-item">Passive fault detection POC achieving 95% precision</div>
+                <div class="changelog-item">Company-wide AI adoption leadership</div>
+              </div>
+              <div class="changelog-section">
+                <div class="changelog-section__label changelog-section__label--changed">Changed</div>
+                <div class="changelog-item">Pivoted company from UV disinfection hardware to CRE analytics platform</div>
+                <div class="changelog-item">Led marketing through leadership vacuum while maintaining PM responsibilities</div>
+                <div class="changelog-item">Overhauled company messaging and competitive positioning</div>
+              </div>
+              <div class="changelog-section">
+                <div class="changelog-section__label changelog-section__label--result">Result</div>
+                <div class="changelog-item changelog-item--result">10-15% energy savings recovered for pilot customers</div>
+                <div class="changelog-item changelog-item--result">Public case study and expansion conversations</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- v6.0 -->
+          <div class="changelog-entry reveal">
+            <div class="changelog-version">
+              <div class="changelog-version__dot"></div>
+              <span class="changelog-version__tag">v6.0</span>
+              <span class="changelog-version__title">LeapFin &mdash; VP Marketing</span>
+              <span class="changelog-version__period">2022 &ndash; 2023</span>
+            </div>
+            <div class="changelog-body">
+              <div class="changelog-section">
+                <div class="changelog-section__label changelog-section__label--added">Added</div>
+                <div class="changelog-item">Marketing function from scratch (Series A)</div>
+                <div class="changelog-item">$13M pipeline, $1.4M ARR YoY</div>
+              </div>
+              <div class="changelog-section">
+                <div class="changelog-section__label changelog-section__label--result">Result</div>
+                <div class="changelog-item changelog-item--result">100% marketing-sourced pipeline</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- v5.0 -->
+          <div class="changelog-entry reveal">
+            <div class="changelog-version">
+              <div class="changelog-version__dot"></div>
+              <span class="changelog-version__tag">v5.0</span>
+              <span class="changelog-version__title">OnPlan &mdash; VP Marketing</span>
+              <span class="changelog-version__period">2021 &ndash; 2022</span>
+            </div>
+            <div class="changelog-body">
+              <div class="changelog-section">
+                <div class="changelog-section__label changelog-section__label--added">Added</div>
+                <div class="changelog-item">Marketing function from scratch (seed stage)</div>
+              </div>
+              <div class="changelog-section">
+                <div class="changelog-section__label changelog-section__label--changed">Changed</div>
+                <div class="changelog-item">Complete rebrand and positioning overhaul</div>
+                <div class="changelog-item">ASP increased 50% through better packaging</div>
+                <div class="changelog-item">Time to value shortened through improved implementation practices</div>
+              </div>
+              <div class="changelog-section">
+                <div class="changelog-section__label changelog-section__label--result">Result</div>
+                <div class="changelog-item changelog-item--result">3X+ YoY ARR growth</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- v4.0 -->
+          <div class="changelog-entry reveal">
+            <div class="changelog-version">
+              <div class="changelog-version__dot"></div>
+              <span class="changelog-version__tag">v4.0</span>
+              <span class="changelog-version__title">AppZen &mdash; VP Product Marketing / Interim CMO</span>
+              <span class="changelog-version__period">2019 &ndash; 2021</span>
+            </div>
+            <div class="changelog-body">
+              <div class="changelog-section">
+                <div class="changelog-section__label changelog-section__label--fixed">Fixed</div>
+                <div class="changelog-item">Net retention: 90% &rarr; 125%</div>
+              </div>
+              <div class="changelog-section">
+                <div class="changelog-section__label changelog-section__label--added">Added</div>
+                <div class="changelog-item">4 product launches, new category with full GTM</div>
+              </div>
+              <div class="changelog-section">
+                <div class="changelog-section__label changelog-section__label--changed">Changed</div>
+                <div class="changelog-item">Repositioned during pandemic</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- v3.0 -->
+          <div class="changelog-entry reveal">
+            <div class="changelog-version">
+              <div class="changelog-version__dot"></div>
+              <span class="changelog-version__tag">v3.0</span>
+              <span class="changelog-version__title">Nuxeo &mdash; VP Product Marketing</span>
+              <span class="changelog-version__period">2016 &ndash; 2019</span>
+            </div>
+            <div class="changelog-body">
+              <div class="changelog-section">
+                <div class="changelog-section__label changelog-section__label--changed">Changed</div>
+                <div class="changelog-item">Repositioned developer product to Enterprise SaaS</div>
+                <div class="changelog-item">Created "Product Asset Management" category</div>
+              </div>
+              <div class="changelog-section">
+                <div class="changelog-section__label changelog-section__label--result">Result</div>
+                <div class="changelog-item changelog-item--result">Pipeline, deal size, ARR all 3X &rarr; 12X ARR exit</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- v2.0 -->
+          <div class="changelog-entry reveal">
+            <div class="changelog-version">
+              <div class="changelog-version__dot"></div>
+              <span class="changelog-version__tag">v2.0</span>
+              <span class="changelog-version__title">HP &mdash; Director Product Marketing</span>
+              <span class="changelog-version__period">2008 &ndash; 2016</span>
+            </div>
+            <div class="changelog-body">
+              <div class="changelog-section">
+                <div class="changelog-section__label changelog-section__label--fixed">Fixed</div>
+                <div class="changelog-item">Returned shrinking business to growth</div>
+              </div>
+              <div class="changelog-section">
+                <div class="changelog-section__label changelog-section__label--added">Added</div>
+                <div class="changelog-item">Leads increased 5X via content marketing</div>
+              </div>
+              <div class="changelog-section">
+                <div class="changelog-section__label changelog-section__label--changed">Changed</div>
+                <div class="changelog-item">Led marketing for internal startup with HP + VC-funded partners</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- v1.0 -->
+          <div class="changelog-entry reveal">
+            <div class="changelog-version">
+              <div class="changelog-version__dot"></div>
+              <span class="changelog-version__tag">v1.0</span>
+              <span class="changelog-version__title">Education</span>
+              <span class="changelog-version__period">Northwestern University</span>
+            </div>
+            <div class="changelog-body">
+              <div class="changelog-section">
+                <div class="changelog-section__label changelog-section__label--added">Added</div>
+                <div class="changelog-item">MBA &mdash; Kellogg School of Management</div>
+                <div class="changelog-item">BA Economics</div>
+                <div class="changelog-item">B. Music, Opera Performance</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ========================================
+             PANEL: TESTIMONIALS (reviews/)
+             ======================================== -->
+        <div class="content-panel" id="panel-testimonials" role="tabpanel">
+
+          <div class="section-header">
+            <h2 class="section-header__title">Reviews</h2>
+            <span class="section-header__path">~/edgewood-park/reviews/</span>
+          </div>
+
+          <div class="review-card reveal">
+            <div class="review-card__header">
+              <span class="review-card__status" aria-label="Approved">&#10003;</span>
+              <span class="review-card__reviewer">Chris McLaughlin</span>
+              <span class="review-card__role">Chief Product Officer, Nuxeo</span>
+            </div>
+            <div class="review-card__body">
+              "Uri was instrumental in positioning the company in the Digital Asset Management space and in developing our enterprise DAM GTM strategy. He is also very adept at learning new technologies and markets and rapidly establishing himself as a thought leader."
+            </div>
+          </div>
+
+          <div class="review-card reveal">
+            <div class="review-card__header">
+              <span class="review-card__status" aria-label="Approved">&#10003;</span>
+              <span class="review-card__reviewer">Kuldeep Misri</span>
+              <span class="review-card__role">Director PM, Salesforce</span>
+            </div>
+            <div class="review-card__body">
+              "Uri is one of the best leaders I've worked with. He's an execution machine. He singlehandedly relaunched our product... Despite being new to our market, he became an expert and compelling spokesperson within a few months."
+            </div>
+          </div>
+
+          <div class="review-card reveal">
+            <div class="review-card__header">
+              <span class="review-card__status" aria-label="Approved">&#10003;</span>
+              <span class="review-card__reviewer">Caitlin Steel</span>
+              <span class="review-card__role">M2 Product, Leapfin</span>
+            </div>
+            <div class="review-card__body">
+              "Uri was a key collaborator when I led product at Leapfin, helping sharpen my thinking about the product vision and roadmap. I have worked with him extensively since then as a coach and thought partner to problem solve product strategy, internal alignment, and management challenges. He brings clarity and originality to every conversation and connects the dots in ways I've never seen."
+            </div>
+          </div>
+
+          <div class="review-card reveal">
+            <div class="review-card__header">
+              <span class="review-card__status" aria-label="Approved">&#10003;</span>
+              <span class="review-card__reviewer">Wendy Yale</span>
+              <span class="review-card__role">CMO, AppZen</span>
+            </div>
+            <div class="review-card__body">
+              "As interim CMO, Uri lay a strong foundation that helped me quickly establish myself when I joined AppZen as CMO. His transparency and clear understanding of marketing, the state of the product, and the opportunities and challenges across the business were prescient."
+            </div>
+          </div>
+
+          <div class="review-card reveal">
+            <div class="review-card__header">
+              <span class="review-card__status" aria-label="Approved">&#10003;</span>
+              <span class="review-card__reviewer">Kash Kapadia</span>
+              <span class="review-card__role">VP, HP</span>
+            </div>
+            <div class="review-card__body">
+              "Uri was a central leader in our launch of new businesses combining software, services, and global distribution."
+            </div>
+          </div>
+
+          <div class="review-card reveal">
+            <div class="review-card__header">
+              <span class="review-card__status" aria-label="Approved">&#10003;</span>
+              <span class="review-card__reviewer">David Greenbaum</span>
+              <span class="review-card__role">CEO, OnPlan</span>
+            </div>
+            <div class="review-card__body">
+              "Uri delivered phenomenal work. His strategic marketing, product, and Board management work was critical to our success, and his presence elevated our management team. Uri's ideas and execution helped us dramatically increase our selling price in just a few months."
+            </div>
+          </div>
+
+
+        </div>
+
+        <!-- ========================================
+             PANEL: CONTACT (CONTRIBUTING.md)
+             ======================================== -->
+        <div class="content-panel" id="panel-contact" role="tabpanel">
+
+          <div class="section-header">
+            <h2 class="section-header__title">Let's Work Together</h2>
+            <span class="section-header__path">~/edgewood-park/CONTRIBUTING.md</span>
+          </div>
+
+          <div class="contact-section">
+
+            <h2 class="contact-section__heading">Available for Consulting &amp; Advisory</h2>
+            <p class="contact-section__sub">
+              Someone doing the work who can help others do it too. I teach teams to use agentic engineering, help product and engineering collaborate as AI shifts roles, and advise on applied AI product strategy.
+            </p>
+
+            <div class="consulting-grid reveal">
+              <div class="consulting-card">
+                <div class="consulting-card__title">Agentic Engineering Coaching</div>
+                <div class="consulting-card__desc">Teach teams to use AI tools to move faster and be more customer-centric. Not prompt engineering &mdash; product engineering with AI as a collaborator.</div>
+              </div>
+              <div class="consulting-card">
+                <div class="consulting-card__title">Eng/Product Collaboration</div>
+                <div class="consulting-card__desc">Help engineering and product teams collaborate better as AI shifts traditional role boundaries. Who builds what, when, and why.</div>
+              </div>
+              <div class="consulting-card">
+                <div class="consulting-card__title">Applied AI Product Strategy</div>
+                <div class="consulting-card__desc">Helping companies figure out how to use AI to solve their specific business problems. Not generic "add AI" advice &mdash; analysis of your competitive landscape, your customers, your constraints.</div>
+              </div>
+            </div>
+
+            <a href="https://linkedin.com/in/kogan/" target="_blank" rel="noopener" class="connect-btn">
+              <span aria-hidden="true">&#8631;</span>
+              Merge &mdash; Connect on LinkedIn
+            </a>
+          </div>
+
+        </div>
+
+      </main><!-- /content-area -->
+    </div><!-- /content column -->
+
+  </div><!-- /main-layout -->
+
+  <!-- Status Bar -->
+  <footer class="status-bar" aria-label="Status bar">
+    <div class="status-bar__item">
+      Available for consulting and advisory
+    </div>
+    <div class="status-bar__right">
+      <div class="status-bar__item">linkedin.com/in/kogan</div>
+    </div>
+  </footer>
+
+</div><!-- /app-shell -->
+
+
+<!-- ============================================================
+     JAVASCRIPT: Tab Navigation, Animations, Mobile Menu, Keyboard
+     ============================================================ -->
+<script>
+(function() {
+  'use strict';
+
+  // ---- DOM References ----
+  var panels = document.querySelectorAll('.content-panel');
+  var fileItems = document.querySelectorAll('.file-tree__item');
+  var contentArea = document.getElementById('contentArea');
+  var sidebar = document.getElementById('sidebar');
+  var mobileMenuBtn = document.getElementById('mobileMenuBtn');
+  var mobileOverlay = document.getElementById('mobileOverlay');
+
+  var fileMap = {
+    'hero': 'uri-kogan.md',
+    'craft': 'how-i-work.md',
+    'projects': 'projects/',
+    'experience': 'CHANGELOG.md',
+    'testimonials': 'reviews/',
+    'contact': 'CONTRIBUTING.md'
+  };
+
+  // ---- Navigation ----
+  function activateTab(tabId) {
+    panels.forEach(function(panel) {
+      panel.classList.toggle('content-panel--active', panel.id === 'panel-' + tabId);
+    });
+
+    fileItems.forEach(function(item) {
+      if (!item.dataset.scroll) {
+        item.classList.toggle('file-tree__item--active', item.dataset.tab === tabId);
+        item.setAttribute('aria-selected', item.dataset.tab === tabId ? 'true' : 'false');
+      }
+    });
+
+    contentArea.scrollTop = 0;
+
+    requestAnimationFrame(function() { observeReveals(); });
+
+    closeMobileMenu();
+  }
+
+  // File tree click/keyboard handlers
+  fileItems.forEach(function(item) {
+    function handleActivation() {
+      var tabId = item.dataset.tab;
+      var scrollTarget = item.dataset.scroll;
+
+      activateTab(tabId);
+
+      if (scrollTarget) {
+        requestAnimationFrame(function() {
+          var target = document.getElementById(scrollTarget);
+          if (target) {
+            setTimeout(function() {
+              target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+          }
+        });
+
+        fileItems.forEach(function(fi) { fi.classList.remove('file-tree__item--active'); });
+        item.classList.add('file-tree__item--active');
+      }
+    }
+
+    item.addEventListener('click', handleActivation);
+    item.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleActivation();
+      }
+    });
+  });
+
+  // ---- Mobile Menu ----
+  function closeMobileMenu() {
+    sidebar.classList.remove('sidebar--mobile-open');
+    mobileOverlay.classList.remove('mobile-overlay--visible');
+    if (mobileMenuBtn) mobileMenuBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  if (mobileMenuBtn) {
+    mobileMenuBtn.addEventListener('click', function() {
+      var isOpen = sidebar.classList.toggle('sidebar--mobile-open');
+      mobileOverlay.classList.toggle('mobile-overlay--visible');
+      this.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+  }
+
+  if (mobileOverlay) {
+    mobileOverlay.addEventListener('click', closeMobileMenu);
+  }
+
+  // ---- Scroll Reveal Animation ----
+  var observer;
+  var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function observeReveals() {
+    if (prefersReducedMotion) {
+      // Show everything immediately
+      document.querySelectorAll('.reveal').forEach(function(el) {
+        el.classList.add('reveal--visible');
+      });
+      return;
+    }
+
+    var reveals = document.querySelectorAll('.reveal:not(.reveal--visible)');
+
+    if (!observer) {
+      observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('reveal--visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, {
+        root: contentArea,
+        threshold: 0.1,
+        rootMargin: '0px 0px -40px 0px'
+      });
+    }
+
+    reveals.forEach(function(el) { observer.observe(el); });
+  }
+
+  observeReveals();
+
+  // ---- Keyboard Navigation ----
+  document.addEventListener('keydown', function(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '7') {
+      e.preventDefault();
+      var tabIds = ['hero', 'craft', 'projects', 'experience', 'testimonials', 'contact'];
+      var index = parseInt(e.key) - 1;
+      if (tabIds[index]) activateTab(tabIds[index]);
+    }
+    if (e.key === 'Escape') closeMobileMenu();
+  });
+
+  // ---- Stat Animation ----
+  var statCells = document.querySelectorAll('.stat-cell__value');
+  var statsObserved = false;
+
+  if (!prefersReducedMotion) {
+    var statsObserver = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting && !statsObserved) {
+          statsObserved = true;
+          statCells.forEach(function(cell, index) {
+            cell.style.opacity = '0';
+            cell.style.transform = 'translateY(10px)';
+            cell.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+            setTimeout(function() {
+              cell.style.opacity = '1';
+              cell.style.transform = 'translateY(0)';
+            }, index * 100);
+          });
+        }
+      });
+    }, { root: contentArea, threshold: 0.5 });
+
+    statCells.forEach(function(cell) { statsObserver.observe(cell); });
+  }
+
+  // ---- Hover effects ----
+  document.querySelectorAll('.project-featured, .project-medium').forEach(function(card) {
+    card.addEventListener('mouseenter', function() {
+      this.style.boxShadow = '0 4px 24px rgba(88, 166, 255, 0.08)';
+    });
+    card.addEventListener('mouseleave', function() {
+      this.style.boxShadow = 'none';
+    });
+  });
+
+  document.querySelectorAll('.review-card').forEach(function(card) {
+    card.addEventListener('mouseenter', function() {
+      var status = this.querySelector('.review-card__status');
+      if (status) { status.style.transform = 'scale(1.2)'; status.style.transition = 'transform 0.2s ease'; }
+    });
+    card.addEventListener('mouseleave', function() {
+      var status = this.querySelector('.review-card__status');
+      if (status) { status.style.transform = 'scale(1)'; }
+    });
+  });
+
+})();
+</script>
+
+<!-- Splash screen data + logic -->
+<script src="splash-data.js"></script>
+<script>
+(function() {
+  var W = SPLASH_DATA.w;
+  var H = SPLASH_DATA.h;
+  var particles = SPLASH_DATA.p;
+  var CHAR_W = 5.2;
+  var ROW_H = 7.5;
+  var gridW = W * CHAR_W;
+  var gridH = H * ROW_H;
+
+  var container = document.getElementById('splash-container');
+  container.style.marginLeft = (-gridW / 2) + 'px';
+  container.style.marginTop = (-gridH / 2) + 'px';
+  container.style.width = gridW + 'px';
+  container.style.height = gridH + 'px';
+
+  var vw = window.innerWidth;
+  var vh = window.innerHeight;
+  var centerRow = H / 2;
+  var centerCol = W / 2;
+  var maxDist = Math.sqrt(centerRow * centerRow + centerCol * centerCol);
+
+  var fragment = document.createDocumentFragment();
+  var spans = [];
+
+  for (var i = 0; i < particles.length; i++) {
+    var row = particles[i][0], col = particles[i][1], ch = particles[i][2];
+    var r = particles[i][3], g = particles[i][4], b = particles[i][5];
+    var tx = col * CHAR_W;
+    var ty = row * ROW_H;
+    var sx = (Math.random() - 0.5) * vw * 1.5 + gridW / 2;
+    var sy = (Math.random() - 0.5) * vh * 1.5 + gridH / 2;
+    var dr = row - centerRow, dc = col - centerCol;
+    var dist = Math.sqrt(dr * dr + dc * dc);
+    var delay = (dist / maxDist) * 1800;
+
+    var span = document.createElement('span');
+    span.className = 'p';
+    span.textContent = ch;
+    span.style.color = 'rgb(' + r + ',' + g + ',' + b + ')';
+    span.style.left = tx + 'px';
+    span.style.top = ty + 'px';
+    span.style.transform = 'translate(' + (sx - tx) + 'px,' + (sy - ty) + 'px)';
+    span.style.opacity = '0';
+    fragment.appendChild(span);
+    spans.push({ el: span, sx: sx, sy: sy, tx: tx, ty: ty, delay: delay });
+  }
+  container.appendChild(fragment);
+
+  var MOVE_DURATION = 4000;
+  var startTime = null;
+
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+  requestAnimationFrame(function firstFrame(now) {
+    for (var i = 0; i < spans.length; i++) spans[i].el.style.opacity = '1';
+    startTime = now;
+    requestAnimationFrame(animate);
+  });
+
+  function animate(now) {
+    var elapsed = now - startTime;
+    var allDone = true;
+    for (var i = 0; i < spans.length; i++) {
+      var s = spans[i];
+      var localElapsed = elapsed - s.delay;
+      if (localElapsed < 0) { allDone = false; continue; }
+      var t = localElapsed / MOVE_DURATION;
+      if (t >= 1) { t = 1; } else { allDone = false; }
+      var ease = easeOutCubic(t);
+      var cx = s.sx + (s.tx - s.sx) * ease;
+      var cy = s.sy + (s.ty - s.sy) * ease;
+      s.el.style.transform = 'translate(' + (cx - s.tx) + 'px,' + (cy - s.ty) + 'px)';
+    }
+    if (!allDone) {
+      requestAnimationFrame(animate);
+    } else {
+      for (var i = 0; i < spans.length; i++) spans[i].el.style.transform = 'translate(0,0)';
+      onAssemblyComplete();
+    }
+  }
+
+  function onAssemblyComplete() {
+    // Show labels
+    document.getElementById('splash-enter').classList.add('visible');
+    document.getElementById('splash-copyright').classList.add('visible');
+    var enterBtn = document.getElementById('splash-enter');
+    enterBtn.classList.add('pulse');
+
+    // Start repulsion
+    var mouseX = -9999, mouseY = -9999;
+    var RADIUS = 60, STRENGTH = 40, SPRING = 0.15;
+    var offsets = new Float32Array(spans.length * 2);
+    var containerRect = container.getBoundingClientRect();
+
+    document.addEventListener('mousemove', function(e) {
+      mouseX = e.clientX - containerRect.left;
+      mouseY = e.clientY - containerRect.top;
+    });
+    document.addEventListener('mouseleave', function() { mouseX = -9999; mouseY = -9999; });
+    window.addEventListener('resize', function() { containerRect = container.getBoundingClientRect(); });
+
+    function repulse() {
+      for (var i = 0; i < spans.length; i++) {
+        var s = spans[i];
+        var dx = s.tx - mouseX, dy = s.ty - mouseY;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        var targetDx = 0, targetDy = 0;
+        if (dist < RADIUS && dist > 0.1) {
+          var force = (1 - dist / RADIUS) * STRENGTH;
+          targetDx = (dx / dist) * force;
+          targetDy = (dy / dist) * force;
+        }
+        var idx = i * 2;
+        offsets[idx] += (targetDx - offsets[idx]) * SPRING;
+        offsets[idx + 1] += (targetDy - offsets[idx + 1]) * SPRING;
+        var ox = offsets[idx], oy = offsets[idx + 1];
+        if (Math.abs(ox) > 0.1 || Math.abs(oy) > 0.1) {
+          s.el.style.transform = 'translate(' + ox + 'px,' + oy + 'px)';
+        } else if (s.el.style.transform !== 'translate(0,0)') {
+          s.el.style.transform = 'translate(0,0)';
+        }
+      }
+      requestAnimationFrame(repulse);
+    }
+    requestAnimationFrame(repulse);
+
+    // Click to enter site
+    enterBtn.addEventListener('click', function() {
+      var splash = document.getElementById('splash');
+      splash.classList.add('fade-out');
+      var appShell = document.querySelector('.app-shell');
+      appShell.style.display = '';
+      setTimeout(function() {
+        splash.style.display = 'none';
+        // Trigger reveal animations on the hero panel
+        document.querySelectorAll('#panel-hero .reveal').forEach(function(el) {
+          el.classList.add('revealed');
+        });
+      }, 800);
+    });
+  }
+})();
+</script>
+
+</body>
+</html>
