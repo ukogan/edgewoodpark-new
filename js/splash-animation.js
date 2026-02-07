@@ -42,7 +42,7 @@
     }
     scale = Math.min(sx, sy, 1);
 
-    var brightness = scale < 1 ? 1 + (1 - scale) * 0.5 : 1;
+    var brightness = scale < 1 ? 1 + (1 - scale) * 1.5 : 1;
     container.style.transform = 'scale(' + scale + ')';
     container.style.transformOrigin = '0 0';
     container.style.filter = brightness > 1 ? 'brightness(' + brightness + ')' : '';
