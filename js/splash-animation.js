@@ -11,20 +11,41 @@
   var gridW = W * CHAR_W;
   var gridH = H * ROW_H;
 
+  var splash = document.getElementById('splash');
+  var portraitWrap = document.getElementById('splash-portrait-wrap');
   var container = document.getElementById('splash-container');
-  container.style.marginLeft = (-gridW / 2) + 'px';
-  container.style.marginTop = (-gridH / 2) + 'px';
   container.style.width = gridW + 'px';
   container.style.height = gridH + 'px';
 
-  // Scale down to fit viewport on small screens
-  var PAD = 0.92;
+  // Scale to fit viewport, reserving space for footer text
+  var PAD = 0.94;
   var scale = 1;
+  var FOOTER_H = 80;
+  var FOOTER_W = 200;
+  var GAP_COL = 16;
+  var GAP_ROW = 32;
+
   function calcScale() {
-    var sx = (window.innerWidth * PAD) / gridW;
-    var sy = (window.innerHeight * PAD) / gridH;
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
+    var isLandscapeMobile = vw > vh && vh < 600;
+
+    splash.classList.toggle('splash--landscape', isLandscapeMobile);
+
+    var sx, sy;
+    if (isLandscapeMobile) {
+      sx = ((vw - FOOTER_W - GAP_ROW) * PAD) / gridW;
+      sy = (vh * PAD) / gridH;
+    } else {
+      sx = (vw * PAD) / gridW;
+      sy = ((vh - FOOTER_H - GAP_COL) * PAD) / gridH;
+    }
     scale = Math.min(sx, sy, 1);
+
     container.style.transform = 'scale(' + scale + ')';
+    container.style.transformOrigin = '0 0';
+    portraitWrap.style.width = Math.ceil(gridW * scale) + 'px';
+    portraitWrap.style.height = Math.ceil(gridH * scale) + 'px';
   }
   calcScale();
   window.addEventListener('resize', calcScale);
@@ -141,7 +162,6 @@
 
     // Click to enter site
     enterBtn.addEventListener('click', function() {
-      var splash = document.getElementById('splash');
       splash.classList.add('fade-out');
       var appShell = document.querySelector('.app-shell');
       appShell.style.display = '';

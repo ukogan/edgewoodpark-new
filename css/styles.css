@@ -110,31 +110,44 @@ a:hover { text-decoration: underline; }
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
   background: #111; z-index: 9999; overflow: hidden;
   transition: opacity 0.8s ease;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 16px;
 }
 #splash.fade-out { opacity: 0; pointer-events: none; }
+#splash.splash--landscape {
+  flex-direction: row; gap: 32px;
+}
+#splash-portrait-wrap {
+  position: relative; flex-shrink: 0;
+}
 #splash-container {
-  position: absolute; top: 50%; left: 50%;
+  position: absolute; top: 0; left: 0;
   font-family: 'Courier New', monospace;
   font-size: 7px; line-height: 7.5px; letter-spacing: 1px;
 }
 #splash .p {
   position: absolute; will-change: transform; white-space: pre; pointer-events: none;
 }
+#splash-footer {
+  display: flex; align-items: baseline; gap: 32px;
+}
+#splash.splash--landscape #splash-footer {
+  flex-direction: column; align-items: flex-start; gap: 12px;
+}
 #splash-enter {
-  position: absolute; bottom: 45px; left: 65px; z-index: 2;
-  font-family: 'Courier New', monospace; font-size: 14px;
+  font-family: 'Courier New', monospace; font-size: 24px;
   color: #e6edf3; background: none; border: none;
-  padding: 12px 24px; cursor: pointer; letter-spacing: 1px;
+  padding: 12px 0; cursor: pointer; letter-spacing: 2px;
   transition: color 0.3s, opacity 1s ease;
-  opacity: 0; pointer-events: none;
+  opacity: 0; pointer-events: none; white-space: nowrap;
 }
 #splash-enter.visible { opacity: 1; pointer-events: auto; }
 #splash-enter:hover { color: #58a6ff; }
 #splash-copyright {
-  position: absolute; bottom: 50px; right: 65px; z-index: 2;
   font-family: 'Courier New', monospace; font-size: 12px;
-  color: #555; background: rgba(17,17,17,0.7); padding: 8px 16px;
-  transition: opacity 1s ease; opacity: 0;
+  color: #555;
+  transition: opacity 1s ease; opacity: 0; white-space: nowrap;
 }
 #splash-copyright.visible { opacity: 1; }
 
