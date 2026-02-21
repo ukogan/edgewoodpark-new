@@ -10,10 +10,13 @@ Edit workflow: edit .md files in content/ -> run python3 build.py -> refresh bro
 import json
 import os
 import re
+import shutil
 import sys
 
-CONTENT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'content')
-OUTPUT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'js', 'content.js')
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+CONTENT_DIR = os.path.join(ROOT_DIR, 'content')
+OUTPUT_FILE = os.path.join(ROOT_DIR, 'js', 'content.js')
+DIST_DIR = os.path.join(ROOT_DIR, 'dist')
 
 # How-I-Work file order (matches sidebar order)
 HIW_FILES = [
@@ -80,11 +83,13 @@ def parse_hero(filepath):
             section = None
             continue
 
-        if section == 'diff' and stripped:
+        if section == 'diff':
             if stripped.startswith('+ '):
                 diff_lines.append({'type': 'added', 'text': stripped[2:]})
             elif stripped.startswith('- '):
                 diff_lines.append({'type': 'removed', 'text': stripped[2:]})
+            elif not stripped and diff_lines:
+                diff_lines.append({'type': 'context', 'text': ''})
         elif section == 'stats' and stripped.startswith('- '):
             parts = stripped[2:].split(' / ', 1)
             if len(parts) == 2:
@@ -310,6 +315,35 @@ def generate_js(hero, hiw, projects, experience, testimonials, contact):
     return '\n'.join(lines)
 
 
+def assemble_dist():
+    """Copy only servable files into dist/ for deployment."""
+    if os.path.exists(DIST_DIR):
+        shutil.rmtree(DIST_DIR)
+    os.makedirs(DIST_DIR)
+
+    # Files and directories to include in the deployment
+    items = [
+        'index.html',
+        'splash-data.js',
+        'css',
+        'js',
+    ]
+
+    for item in items:
+        src = os.path.join(ROOT_DIR, item)
+        dst = os.path.join(DIST_DIR, item)
+        if os.path.isdir(src):
+            shutil.copytree(src, dst)
+        elif os.path.isfile(src):
+            shutil.copy2(src, dst)
+        else:
+            print(f'  Warning: {item} not found, skipping', file=sys.stderr)
+
+    # Count files for summary
+    file_count = sum(len(files) for _, _, files in os.walk(DIST_DIR))
+    print(f'build.py: Assembled dist/ ({file_count} files)')
+
+
 def main():
     print('build.py: Reading content files...')
 
@@ -337,7 +371,9 @@ def main():
     with open(OUTPUT_FILE, 'w') as f:
         f.write(js)
 
-    print(f'\nbuild.py: Generated {OUTPUT_FILE} ({len(js)} bytes)')
+    print(f'build.py: Generated {OUTPUT_FILE} ({len(js)} bytes)')
+
+    assemble_dist()
 
 
 if __name__ == '__main__':
