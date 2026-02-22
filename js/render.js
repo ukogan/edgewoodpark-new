@@ -47,21 +47,7 @@ function renderHero(data) {
       '</div>';
   });
 
-  // Add empty context line between removed and added (line 2)
-  var firstAddedIdx = -1;
-  for (var i = 0; i < data.diffLines.length; i++) {
-    if (data.diffLines[i].type === 'added') { firstAddedIdx = i; break; }
-  }
-  if (firstAddedIdx > 0 && data.diffLines[firstAddedIdx - 1].type === 'removed') {
-    var lines = diffHtml.split('</div>');
-    var contextLine = '<div class="diff-line diff-line--context">' +
-      '<span class="diff-line__number">' + (firstAddedIdx + 1) + '</span>' +
-      '<span class="diff-line__prefix"></span>' +
-      '<span class="diff-line__content"></span>' +
-      '</div>';
-    lines.splice(firstAddedIdx, 0, contextLine);
-    diffHtml = lines.join('</div>');
-  }
+  // Blank context lines are now driven by content (blank lines in hero.md)
 
   var statsHtml = '';
   data.stats.forEach(function(stat) {
@@ -86,7 +72,13 @@ function renderHero(data) {
         '<div class="diff-block__body">' + diffHtml + '</div>' +
       '</div>' +
       '<div class="stats-bar" aria-label="Key metrics">' + statsHtml + '</div>' +
+      '<div id="contrib-graph-mount"></div>' +
     '</div>';
+
+  // Render contribution graph if data available
+  if (typeof contributionsData !== 'undefined' && contributionsData) {
+    renderContribGraph(contributionsData);
+  }
 }
 
 function highlightMarkdownLine(line, fileKey) {
@@ -371,6 +363,165 @@ function renderTestimonials(data) {
   });
 
   panel.innerHTML = html;
+}
+
+function renderContribGraph(data) {
+  var mount = document.getElementById('contrib-graph-mount');
+  if (!mount || !data || !data.contributions) return;
+
+  var contributions = data.contributions;
+  var total = data.total || 0;
+
+  var MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  // Build the grid cells and track week-to-month mapping
+  var cellsHtml = '';
+  var weekMonths = [];
+  var currentWeek = -1;
+
+  for (var i = 0; i < contributions.length; i++) {
+    var c = contributions[i];
+    var weekIndex = Math.floor(i / 7);
+
+    if (weekIndex !== currentWeek) {
+      currentWeek = weekIndex;
+      // Extract month from date string (YYYY-MM-DD)
+      var month = parseInt(c.date.split('-')[1], 10) - 1;
+      weekMonths.push(month);
+    }
+
+    var level = c.level || 0;
+    var count = c.count || 0;
+    var countLabel = count === 0 ? 'No contributions' :
+                     count === 1 ? '1 contribution' :
+                     count + ' contributions';
+
+    cellsHtml += '<div class="contrib-graph__cell contrib-graph__cell--level-' + level + '"' +
+      ' data-date="' + escapeHtml(c.date) + '"' +
+      ' data-count="' + count + '"' +
+      ' role="gridcell" tabindex="-1"' +
+      ' aria-label="' + countLabel + ' on ' + escapeHtml(c.date) + '"' +
+      '></div>';
+  }
+
+  // Build month labels
+  var monthLabelsHtml = '';
+  var COL_WIDTH = 14; // 11px cell + 3px gap
+  var lastMonth = -1;
+  for (var w = 0; w < weekMonths.length; w++) {
+    if (weekMonths[w] !== lastMonth) {
+      // Count span columns for this month
+      var spanCols = 0;
+      for (var w2 = w; w2 < weekMonths.length && weekMonths[w2] === weekMonths[w]; w2++) {
+        spanCols++;
+      }
+      monthLabelsHtml += '<span class="contrib-graph__month-label" style="width:' +
+        (spanCols * COL_WIDTH) + 'px">' + MONTH_NAMES[weekMonths[w]] + '</span>';
+      lastMonth = weekMonths[w];
+    }
+  }
+
+  // Chart icon SVG
+  var chartIcon = '<svg class="contrib-graph__header-icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">' +
+    '<path d="M1.5 1.75V13.5h13.75a.75.75 0 0 1 0 1.5H.75a.75.75 0 0 1-.75-.75V1.75a.75.75 0 0 1 1.5 0Zm14.28 2.53-5.25 5.25a.75.75 0 0 1-1.06 0L7 7.06 4.28 9.78a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l3.25-3.25a.75.75 0 0 1 1.06 0L10 7.94l4.72-4.72a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042Z"/>' +
+    '</svg>';
+
+  // Legend cells
+  var legendHtml = '';
+  var legendColors = ['#21262d', '#0e4429', '#006d32', '#26a641', '#39d353'];
+  for (var lc = 0; lc < legendColors.length; lc++) {
+    legendHtml += '<div class="contrib-graph__legend-cell" style="background:' + legendColors[lc] + ';"></div>';
+  }
+
+  mount.innerHTML =
+    '<div class="contrib-graph" aria-label="Contribution activity graph">' +
+      '<div class="contrib-graph__header">' +
+        chartIcon +
+        '<span class="contrib-graph__filename">contributions.graph</span>' +
+        '<span class="contrib-graph__count">' +
+          '<strong>' + total + '</strong> contributions in the last year' +
+        '</span>' +
+      '</div>' +
+      '<div class="contrib-graph__body">' +
+        '<div class="contrib-graph__wrapper">' +
+          '<div class="contrib-graph__months" aria-hidden="true">' + monthLabelsHtml + '</div>' +
+          '<div class="contrib-graph__grid-area">' +
+            '<div class="contrib-graph__day-labels" aria-hidden="true">' +
+              '<div class="contrib-graph__day-label"></div>' +
+              '<div class="contrib-graph__day-label">Mon</div>' +
+              '<div class="contrib-graph__day-label"></div>' +
+              '<div class="contrib-graph__day-label">Wed</div>' +
+              '<div class="contrib-graph__day-label"></div>' +
+              '<div class="contrib-graph__day-label">Fri</div>' +
+              '<div class="contrib-graph__day-label"></div>' +
+            '</div>' +
+            '<div class="contrib-graph__grid" role="group" aria-label="Contribution cells">' +
+              cellsHtml +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="contrib-graph__footer">' +
+        '<div class="contrib-graph__legend">' +
+          '<span class="contrib-graph__legend-label">Less</span>' +
+          legendHtml +
+          '<span class="contrib-graph__legend-label">More</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  // Tooltip behavior
+  var tooltip = document.getElementById('contrib-tooltip');
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.className = 'contrib-tooltip';
+    tooltip.id = 'contrib-tooltip';
+    tooltip.setAttribute('aria-hidden', 'true');
+    tooltip.innerHTML = '<span class="contrib-tooltip__count" id="tooltip-count"></span>' +
+      '<span class="contrib-tooltip__date" id="tooltip-date"></span>';
+    document.body.appendChild(tooltip);
+  }
+
+  var tooltipCount = document.getElementById('tooltip-count');
+  var tooltipDate = document.getElementById('tooltip-date');
+  var grid = mount.querySelector('.contrib-graph__grid');
+
+  grid.addEventListener('mouseover', function(e) {
+    var cell = e.target.closest('.contrib-graph__cell');
+    if (!cell) return;
+
+    var count = parseInt(cell.getAttribute('data-count'), 10);
+    var dateStr = cell.getAttribute('data-date');
+
+    if (count === 0) {
+      tooltipCount.textContent = 'No contributions';
+    } else if (count === 1) {
+      tooltipCount.textContent = '1 contribution';
+    } else {
+      tooltipCount.textContent = count + ' contributions';
+    }
+
+    // Format date: YYYY-MM-DD -> Month Day, Year
+    var parts = dateStr.split('-');
+    var monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+    var monthIndex = parseInt(parts[1], 10) - 1;
+    var day = parseInt(parts[2], 10);
+    tooltipDate.textContent = ' on ' + monthNames[monthIndex] + ' ' + day + ', ' + parts[0];
+
+    tooltip.classList.add('contrib-tooltip--visible');
+
+    var rect = cell.getBoundingClientRect();
+    tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px';
+    tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + 'px';
+  });
+
+  grid.addEventListener('mouseout', function(e) {
+    var cell = e.target.closest('.contrib-graph__cell');
+    if (!cell) return;
+    tooltip.classList.remove('contrib-tooltip--visible');
+  });
 }
 
 function renderContact(data) {
