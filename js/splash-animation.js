@@ -1,35 +1,78 @@
 /**
- * splash-animation.js -- Particle assembly animation for splash screen.
+ * splash-animation.js -- Canvas-based particle assembly animation for splash screen.
+ * Renders 8400 ASCII characters on a single <canvas> instead of individual DOM elements.
  * Depends on SPLASH_DATA from splash-data.js.
  */
 (function() {
   var W = SPLASH_DATA.w;
   var H = SPLASH_DATA.h;
-  var particles = SPLASH_DATA.p;
+  var rawParticles = SPLASH_DATA.p;
   var CHAR_W = 5.2;
   var ROW_H = 7.5;
   var gridW = W * CHAR_W;
   var gridH = H * ROW_H;
+  var N = rawParticles.length;
 
   var splash = document.getElementById('splash');
   var portraitWrap = document.getElementById('splash-portrait-wrap');
   var container = document.getElementById('splash-container');
-  container.style.width = gridW + 'px';
-  container.style.height = gridH + 'px';
+  container.style.display = 'none';
 
-  // Scale to fit viewport, reserving space for footer text
+  // --- Canvas setup (fullscreen, behind other splash elements) ---
+  var dpr = window.devicePixelRatio || 1;
+  var canvas = document.createElement('canvas');
+  canvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;';
+  splash.insertBefore(canvas, splash.firstChild);
+  var ctx = canvas.getContext('2d');
+
+  // --- Layout state ---
   var PAD = 0.94;
   var scale = 1;
   var FOOTER_H = 80;
   var FOOTER_W = 200;
   var GAP_COL = 16;
   var GAP_ROW = 32;
+  var gridOffsetX = 0, gridOffsetY = 0;
+  var brightness = 1;
 
-  function calcScale() {
+  // --- Particle data (immutable from source) ---
+  var pRow = new Uint8Array(N);
+  var pCol = new Uint8Array(N);
+  var pChar = new Array(N);
+  var pR = new Uint8Array(N);
+  var pG = new Uint8Array(N);
+  var pB = new Uint8Array(N);
+  var pVisible = new Uint8Array(N); // 1 if non-space, 0 if space
+
+  for (var i = 0; i < N; i++) {
+    var p = rawParticles[i];
+    pRow[i] = p[0]; pCol[i] = p[1]; pChar[i] = p[2];
+    pR[i] = p[3]; pG[i] = p[4]; pB[i] = p[5];
+    pVisible[i] = p[2] !== ' ' ? 1 : 0;
+  }
+
+  // --- Computed positions (updated on resize) ---
+  var txArr = new Float32Array(N);
+  var tyArr = new Float32Array(N);
+  var colorArr = new Array(N);
+
+  // --- Animation state ---
+  var sxArr = new Float32Array(N);
+  var syArr = new Float32Array(N);
+  var delayArr = new Float32Array(N);
+  var curPos = new Float32Array(N * 2);
+  var assemblyDone = false;
+  var dismissed = false;
+
+  function updateLayout() {
     var vw = window.innerWidth;
     var vh = window.innerHeight;
-    var isLandscapeMobile = vw > vh && vh < 600;
 
+    canvas.width = vw * dpr;
+    canvas.height = vh * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    var isLandscapeMobile = vw > vh && vh < 600;
     splash.classList.toggle('splash--landscape', isLandscapeMobile);
 
     var sx, sy;
@@ -42,109 +85,177 @@
     }
     scale = Math.min(sx, sy, 1);
 
-    var brightness = scale < 1 ? 1 + (1 - scale) * 1.5 : 1;
-    container.style.transform = 'scale(' + scale + ')';
-    container.style.transformOrigin = '0 0';
-    container.style.filter = brightness > 1 ? 'brightness(' + brightness + ')' : '';
     portraitWrap.style.width = Math.ceil(gridW * scale) + 'px';
     portraitWrap.style.height = Math.ceil(gridH * scale) + 'px';
-  }
-  calcScale();
-  window.addEventListener('resize', calcScale);
 
-  var vw = window.innerWidth;
-  var vh = window.innerHeight;
+    var rect = portraitWrap.getBoundingClientRect();
+    gridOffsetX = rect.left;
+    gridOffsetY = rect.top;
+
+    brightness = scale < 1 ? 1 + (1 - scale) * 1.5 : 1;
+
+    for (var i = 0; i < N; i++) {
+      txArr[i] = gridOffsetX + pCol[i] * CHAR_W * scale;
+      tyArr[i] = gridOffsetY + pRow[i] * ROW_H * scale;
+      var r = pR[i], g = pG[i], b = pB[i];
+      if (brightness > 1) {
+        r = Math.min(255, Math.round(r * brightness));
+        g = Math.min(255, Math.round(g * brightness));
+        b = Math.min(255, Math.round(b * brightness));
+      }
+      colorArr[i] = 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
+  }
+
+  updateLayout();
+
+  // --- Compute start positions and delays (once, based on initial viewport) ---
+  var vw0 = window.innerWidth;
+  var vh0 = window.innerHeight;
   var centerRow = H / 2;
   var centerCol = W / 2;
   var maxDist = Math.sqrt(centerRow * centerRow + centerCol * centerCol);
+  var cx0 = gridOffsetX + gridW * scale / 2;
+  var cy0 = gridOffsetY + gridH * scale / 2;
 
-  var fragment = document.createDocumentFragment();
-  var spans = [];
-
-  for (var i = 0; i < particles.length; i++) {
-    var row = particles[i][0], col = particles[i][1], ch = particles[i][2];
-    var r = particles[i][3], g = particles[i][4], b = particles[i][5];
-    var tx = col * CHAR_W;
-    var ty = row * ROW_H;
-    var sx = (Math.random() - 0.5) * (vw / scale) * 1.5 + gridW / 2;
-    var sy = (Math.random() - 0.5) * (vh / scale) * 1.5 + gridH / 2;
-    var dr = row - centerRow, dc = col - centerCol;
+  for (var i = 0; i < N; i++) {
+    sxArr[i] = cx0 + (Math.random() - 0.5) * vw0 * 1.5;
+    syArr[i] = cy0 + (Math.random() - 0.5) * vh0 * 1.5;
+    var dr = pRow[i] - centerRow, dc = pCol[i] - centerCol;
     var dist = Math.sqrt(dr * dr + dc * dc);
-    var delay = (dist / maxDist) * 1800;
-
-    var span = document.createElement('span');
-    span.className = 'p';
-    span.textContent = ch;
-    span.style.color = 'rgb(' + r + ',' + g + ',' + b + ')';
-    span.style.left = tx + 'px';
-    span.style.top = ty + 'px';
-    span.style.transform = 'translate(' + (sx - tx) + 'px,' + (sy - ty) + 'px)';
-    span.style.opacity = '0';
-    fragment.appendChild(span);
-    spans.push({ el: span, sx: sx, sy: sy, tx: tx, ty: ty, delay: delay });
+    delayArr[i] = (dist / maxDist) * 1800;
   }
-  container.appendChild(fragment);
 
+  // --- Resize handler ---
+  window.addEventListener('resize', function() {
+    if (dismissed) return;
+    updateLayout();
+    if (assemblyDone) {
+      for (var i = 0; i < N; i++) {
+        curPos[i * 2] = txArr[i];
+        curPos[i * 2 + 1] = tyArr[i];
+      }
+      drawFrame();
+    }
+  });
+
+  // --- Drawing ---
+  function drawFrame() {
+    var w = canvas.width / dpr;
+    var h = canvas.height / dpr;
+    ctx.clearRect(0, 0, w, h);
+    var fs = Math.max(1, 7 * scale);
+    ctx.font = fs + 'px "Courier New",monospace';
+    ctx.textBaseline = 'top';
+    for (var i = 0; i < N; i++) {
+      if (!pVisible[i]) continue;
+      ctx.fillStyle = colorArr[i];
+      ctx.fillText(pChar[i], curPos[i * 2], curPos[i * 2 + 1]);
+    }
+  }
+
+  // --- Animation ---
   var MOVE_DURATION = 4000;
   var startTime = null;
 
   function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
 
-  requestAnimationFrame(function firstFrame(now) {
-    for (var i = 0; i < spans.length; i++) spans[i].el.style.opacity = '1';
-    startTime = now;
-    requestAnimationFrame(animate);
-  });
+  // Respect prefers-reduced-motion
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    for (var i = 0; i < N; i++) {
+      curPos[i * 2] = txArr[i];
+      curPos[i * 2 + 1] = tyArr[i];
+    }
+    drawFrame();
+    assemblyDone = true;
+    onAssemblyComplete();
+  } else {
+    requestAnimationFrame(function firstFrame(now) {
+      startTime = now;
+      requestAnimationFrame(animate);
+    });
+  }
 
   function animate(now) {
     var elapsed = now - startTime;
     var allDone = true;
-    for (var i = 0; i < spans.length; i++) {
-      var s = spans[i];
-      var localElapsed = elapsed - s.delay;
-      if (localElapsed < 0) { allDone = false; continue; }
+    for (var i = 0; i < N; i++) {
+      var localElapsed = elapsed - delayArr[i];
+      if (localElapsed < 0) {
+        curPos[i * 2] = sxArr[i];
+        curPos[i * 2 + 1] = syArr[i];
+        allDone = false;
+        continue;
+      }
       var t = localElapsed / MOVE_DURATION;
       if (t >= 1) { t = 1; } else { allDone = false; }
       var ease = easeOutCubic(t);
-      var cx = s.sx + (s.tx - s.sx) * ease;
-      var cy = s.sy + (s.ty - s.sy) * ease;
-      s.el.style.transform = 'translate(' + (cx - s.tx) + 'px,' + (cy - s.ty) + 'px)';
+      curPos[i * 2] = sxArr[i] + (txArr[i] - sxArr[i]) * ease;
+      curPos[i * 2 + 1] = syArr[i] + (tyArr[i] - syArr[i]) * ease;
     }
+    drawFrame();
     if (!allDone) {
       requestAnimationFrame(animate);
     } else {
-      for (var i = 0; i < spans.length; i++) spans[i].el.style.transform = 'translate(0,0)';
+      assemblyDone = true;
       onAssemblyComplete();
     }
   }
 
   function onAssemblyComplete() {
-    // Show labels
     document.getElementById('splash-enter').classList.add('visible');
     document.getElementById('splash-copyright').classList.add('visible');
-    var enterBtn = document.getElementById('splash-enter');
 
-    // Start repulsion
+    for (var i = 0; i < N; i++) {
+      curPos[i * 2] = txArr[i];
+      curPos[i * 2 + 1] = tyArr[i];
+    }
+    drawFrame();
+
+    // No repulsion on touch devices (no hover cursor, saves CPU/battery)
+    var isTouchDevice = window.matchMedia('(hover: none)').matches;
+    if (!isTouchDevice) {
+      startRepulsion();
+    }
+
+    document.getElementById('splash-enter').addEventListener('click', function() {
+      dismissed = true;
+      splash.classList.add('fade-out');
+      document.querySelector('.app-shell').style.display = '';
+      setTimeout(function() {
+        splash.style.display = 'none';
+        document.querySelectorAll('#panel-hero .reveal').forEach(function(el) {
+          el.classList.add('revealed');
+        });
+      }, 800);
+    });
+  }
+
+  function startRepulsion() {
     var mouseX = -9999, mouseY = -9999;
-    var RADIUS = 60, STRENGTH = 40, SPRING = 0.15;
-    var offsets = new Float32Array(spans.length * 2);
-    var containerRect = container.getBoundingClientRect();
+    var SPRING = 0.15;
+    var offsets = new Float32Array(N * 2);
 
     document.addEventListener('mousemove', function(e) {
-      mouseX = (e.clientX - containerRect.left) / scale;
-      mouseY = (e.clientY - containerRect.top) / scale;
+      mouseX = e.clientX;
+      mouseY = e.clientY;
     });
-    document.addEventListener('mouseleave', function() { mouseX = -9999; mouseY = -9999; });
-    window.addEventListener('resize', function() { containerRect = container.getBoundingClientRect(); });
+    document.addEventListener('mouseleave', function() {
+      mouseX = -9999; mouseY = -9999;
+    });
 
     function repulse() {
-      for (var i = 0; i < spans.length; i++) {
-        var s = spans[i];
-        var dx = s.tx - mouseX, dy = s.ty - mouseY;
+      if (dismissed) return;
+      var radius = 60 * scale;
+      var strength = 40 * scale;
+      var needsRedraw = false;
+      for (var i = 0; i < N; i++) {
+        var dx = txArr[i] - mouseX;
+        var dy = tyArr[i] - mouseY;
         var dist = Math.sqrt(dx * dx + dy * dy);
         var targetDx = 0, targetDy = 0;
-        if (dist < RADIUS && dist > 0.1) {
-          var force = (1 - dist / RADIUS) * STRENGTH;
+        if (dist < radius && dist > 0.1) {
+          var force = (1 - dist / radius) * strength;
           targetDx = (dx / dist) * force;
           targetDy = (dy / dist) * force;
         }
@@ -153,27 +264,19 @@
         offsets[idx + 1] += (targetDy - offsets[idx + 1]) * SPRING;
         var ox = offsets[idx], oy = offsets[idx + 1];
         if (Math.abs(ox) > 0.1 || Math.abs(oy) > 0.1) {
-          s.el.style.transform = 'translate(' + ox + 'px,' + oy + 'px)';
-        } else if (s.el.style.transform !== 'translate(0,0)') {
-          s.el.style.transform = 'translate(0,0)';
+          curPos[idx] = txArr[i] + ox;
+          curPos[idx + 1] = tyArr[i] + oy;
+          needsRedraw = true;
+        } else {
+          curPos[idx] = txArr[i];
+          curPos[idx + 1] = tyArr[i];
         }
+      }
+      if (needsRedraw) {
+        drawFrame();
       }
       requestAnimationFrame(repulse);
     }
     requestAnimationFrame(repulse);
-
-    // Click to enter site
-    enterBtn.addEventListener('click', function() {
-      splash.classList.add('fade-out');
-      var appShell = document.querySelector('.app-shell');
-      appShell.style.display = '';
-      setTimeout(function() {
-        splash.style.display = 'none';
-        // Trigger reveal animations on the hero panel
-        document.querySelectorAll('#panel-hero .reveal').forEach(function(el) {
-          el.classList.add('revealed');
-        });
-      }, 800);
-    });
   }
 })();

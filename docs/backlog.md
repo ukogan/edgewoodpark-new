@@ -21,5 +21,9 @@
 - Current CONTRIBUTING.md page needs formatting rethink to align with the IDE/diff theme
 - Consulting cards feel like a different design language from the rest of the site
 
+## Mobile Responsiveness
+- Splash screen: ASCII art grid too wide on mobile — needs to scale down or reflow for narrow viewports
+- Main site: navigation (sidebar file tree) needs mobile-friendly treatment — hamburger menu, drawer, or alternative pattern
+
 ## General
 - Add links to GitHub profile/repos
